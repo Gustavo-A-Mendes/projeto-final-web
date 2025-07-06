@@ -636,37 +636,84 @@ function loadHistoricoUsuario() {
 }
 
 // Carregar usuários (admin)
-function loadUsuarios() {
-    const tbody = document.getElementById("usuarios-tbody");
-    tbody.innerHTML = "";
+// Carregar usuários diretamente do Cognito (admin)
+async function loadUsuarios() {
+  const tbody = document.getElementById("usuarios-tbody")
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #666;">Carregando usuários...</td></tr>'
 
-    usuarios.forEach((usuario) => {
-        const row = document.createElement("tr");
-        const statusClass =
-            usuario.status === "Confirmado"
-                ? "status-confirmed"
-                : "status-pending";
+  try {
+    // Buscar usuários do Cognito
+    const params = {
+      UserPoolId: poolData.UserPoolId,
+      Limit: 60, // Máximo de usuários por página
+    }
 
-        row.innerHTML = `
-            <td>${usuario.nome}</td>
-            <td>${usuario.email}</td>
-            <td><span class="status-badge ${statusClass}">${
-            usuario.status
-        }</span></td>
-            <td>${usuario.movimentacoesAtivas}</td>
-            <td>${usuario.ultimoAcesso}</td>
-            <td>
-                ${
-                    usuario.movimentacoesAtivas === 0
-                        ? `<button class="btn-danger" onclick="deleteUser('${usuario.email}', '${usuario.nome}')">Excluir</button>`
-                        : '<span style="color: #666;">Tem materiais pendentes</span>'
-                }
-            </td>
-        `;
-        tbody.appendChild(row);
-    });
+    const result = await cognitoIdentityServiceProvider.listUsers(params).promise()
+    tbody.innerHTML = ""
+
+    if (result.Users.length === 0) {
+      tbody.innerHTML =
+        '<tr><td colspan="6" style="text-align: center; color: #666;">Nenhum usuário encontrado</td></tr>'
+      return
+    }
+
+    // Processar cada usuário
+    for (const user of result.Users) {
+      const email = user.Attributes.find((attr) => attr.Name === "email")?.Value || "N/A"
+      const name = user.Attributes.find((attr) => attr.Name === "name")?.Value || email
+      const status =
+        user.UserStatus === "CONFIRMED"
+          ? "Confirmado"
+          : user.UserStatus === "UNCONFIRMED"
+            ? "Pendente"
+            : user.UserStatus
+
+      // Contar movimentações ativas
+      const activeMovements = movimentacoes.filter(
+        (mov) => (mov.usuario === name || mov.usuario === email) && mov.status === "Em uso",
+      ).length
+
+      const lastLogin = user.UserLastModifiedDate
+        ? new Date(user.UserLastModifiedDate).toLocaleDateString("pt-BR")
+        : "Nunca"
+
+      const row = document.createElement("tr")
+      const statusClass = status === "Confirmado" ? "status-confirmed" : "status-pending"
+
+      row.innerHTML = `
+                <td>${name}</td>
+                <td>${email}</td>
+                <td><span class="status-badge ${statusClass}">${status}</span></td>
+                <td>${activeMovements}</td>
+                <td>${lastLogin}</td>
+                <td>
+                    ${
+                      activeMovements === 0 && email !== currentUser?.getUsername()
+                        ? `<button class="btn-danger" onclick="deleteUserFromCognito('${email}', '${name}')">Excluir</button>`
+                        : activeMovements > 0
+                          ? '<span style="color: #666;">Tem materiais pendentes</span>'
+                          : '<span style="color: #666;">Usuário atual</span>'
+                    }
+                </td>
+            `
+      tbody.appendChild(row)
+    }
+  } catch (error) {
+    console.error("Erro ao carregar usuários:", error)
+    tbody.innerHTML =
+      '<tr><td colspan="6" style="text-align: center; color: #f00;">Erro ao carregar usuários. Verifique as permissões.</td></tr>'
+
+    if (error.code === "NotAuthorizedException") {
+      showAlert(
+        "usuarios-alert",
+        "Erro: Sem permissão para listar usuários. Configure as credenciais de administrador.",
+        "error",
+      )
+    } else {
+      showAlert("usuarios-alert", `Erro ao carregar usuários: ${error.message}`, "error")
+    }
+  }
 }
-
 // Cadastrar material (admin):
 document.getElementById("material-form").addEventListener("submit", function (e) {
     e.preventDefault();
@@ -875,89 +922,110 @@ function deleteUserAccount() {
     );
 }
 
-// Deletar usuário (admin)
-function deleteUser(email, nome) {
-    // Verificar se há movimentações pendentes
-    const activeMovements = movimentacoes.filter(
-        (mov) => mov.usuario === nome && mov.status === "Em uso"
-    );
+// Deletar usuário:
+async function executeSelfDeleteAccount(email, nome) {
+  try {
+    showAlert("perfil-alert", "Excluindo conta...", "info")
 
-    if (activeMovements.length > 0) {
-        showModal(
-            "Não é possível excluir usuário",
-            `O usuário ${nome} possui materiais que ainda não foram devolvidos.`,
-            `<strong>Materiais pendentes:</strong>
-            <ul>
-                ${activeMovements
-                    .map(
-                        (mov) => `<li>${mov.material} (${mov.quantidade})</li>`
-                    )
-                    .join("")}
-            </ul>`,
-            null
-        );
-        return;
-    }
+    // Usuário pode deletar a própria conta
+    await currentUser.deleteUser((err, result) => {
+      if (err) {
+        console.error("Erro ao excluir própria conta:", err)
+        showAlert("perfil-alert", `Erro ao excluir conta: ${err.message}`, "error")
+        return
+      }
 
+      // Marcar movimentações como de usuário excluído
+      movimentacoes.forEach((mov) => {
+        if (mov.usuario === nome || mov.usuario === email) {
+          mov.usuarioExcluido = true
+        }
+      })
+
+      saveDataToStorage()
+
+      showAlert("perfil-alert", "Conta excluída com sucesso. Você será desconectado.", "success")
+
+      setTimeout(() => {
+        logout()
+      }, 2000)
+    })
+  } catch (error) {
+    console.error("Erro ao excluir própria conta:", error)
+    showAlert("perfil-alert", "Erro ao excluir conta. Tente novamente.", "error")
+  }
+}
+
+// Deletar usuário do Cognito
+async function deleteUserFromCognito(email, nome) {
+  // Verificar se há movimentações pendentes
+  const activeMovements = movimentacoes.filter(
+    (mov) => (mov.usuario === nome || mov.usuario === email) && mov.status === "Em uso",
+  )
+
+  if (activeMovements.length > 0) {
     showModal(
-        "⚠️ Excluir Usuário",
-        `Tem certeza que deseja excluir o usuário ${nome}?`,
-        "<strong>Consequências:</strong><br>• A conta será permanentemente removida<br>• O usuário perderá acesso ao sistema<br>• O histórico será mantido para fins de auditoria",
-        () => executeDeleteAccount(email, nome)
-    );
+      "Não é possível excluir usuário",
+      `O usuário ${nome} possui materiais que ainda não foram devolvidos.`,
+      `<strong>Materiais pendentes:</strong>
+            <ul>
+                ${activeMovements.map((mov) => `<li>${mov.material} (${mov.quantidade})</li>`).join("")}
+            </ul>`,
+      null,
+    )
+    return
+  }
+
+  showModal(
+    "⚠️ Excluir Usuário",
+    `Tem certeza que deseja excluir o usuário ${nome}?`,
+    "<strong>Consequências:</strong><br>• A conta será permanentemente removida do Cognito<br>• O usuário perderá acesso ao sistema<br>• O histórico será mantido para fins de auditoria",
+    () => executeDeleteUserFromCognito(email, nome),
+  )
 }
 
-// Executar exclusão da conta
-function executeDeleteAccount(email, nome) {
-    try {
-        // Remover usuário da lista local
-        const userIndex = usuarios.findIndex((u) => u.email === email);
-        if (userIndex > -1) {
-            usuarios.splice(userIndex, 1);
-            saveDataToStorage();
-        }
+// Executar exclusão real do usuário no Cognito
+async function executeDeleteUserFromCognito(email, nome) {
+  try {
+    showAlert("usuarios-alert", "Excluindo usuário...", "info")
 
-        // Se for o próprio usuário, fazer logout
-        if (currentUser && currentUser.getUsername() === email) {
-            showAlert(
-                "perfil-alert",
-                "Conta excluída com sucesso. Você será desconectado.",
-                "success"
-            );
-            setTimeout(() => {
-                logout();
-            }, 2000);
-        } else {
-            // Se for admin excluindo outro usuário
-            showAlert(
-                "usuarios-alert",
-                `Usuário ${nome} excluído com sucesso.`,
-                "success"
-            );
-            loadUsuarios();
-        }
-
-        // Em produção, aqui faria a chamada para o Cognito
-        // deleteUserFromCognito(email);
-    } catch (error) {
-        console.error("Erro ao excluir conta:", error);
-        const alertId =
-            currentUser && currentUser.getUsername() === email
-                ? "perfil-alert"
-                : "usuarios-alert";
-        showAlert(alertId, "Erro ao excluir conta. Tente novamente.", "error");
+    const params = {
+      UserPoolId: poolData.UserPoolId,
+      Username: email,
     }
-}
 
-// Função para deletar usuário do Cognito (para implementação futura)
-function deleteUserFromCognito(email) {
-    // Esta função seria implementada com as credenciais de admin
-    // const cognitoIdentityServiceProvider = new AWS.CognitoIdentityServiceProvider();
-    // const params = {
-    //     UserPoolId: poolData.UserPoolId,
-    //     Username: email
-    // };
-    // cognitoIdentityServiceProvider.adminDeleteUser(params, callback);
+    await cognitoIdentityServiceProvider.adminDeleteUser(params).promise()
+
+    // Remover das movimentações locais (manter histórico mas marcar como usuário excluído)
+    movimentacoes.forEach((mov) => {
+      if (mov.usuario === nome || mov.usuario === email) {
+        mov.usuarioExcluido = true
+      }
+    })
+
+    saveDataToStorage()
+
+    showAlert("usuarios-alert", `Usuário ${nome} excluído com sucesso do Cognito.`, "success")
+
+    // Recarregar lista de usuários
+    setTimeout(() => {
+      loadUsuarios()
+    }, 1000)
+  } catch (error) {
+    console.error("Erro ao excluir usuário do Cognito:", error)
+
+    let errorMessage = "Erro ao excluir usuário. "
+
+    if (error.code === "NotAuthorizedException") {
+      errorMessage += "Sem permissão para excluir usuários. Configure as credenciais de administrador."
+    } else if (error.code === "UserNotFoundException") {
+      errorMessage += "Usuário não encontrado no Cognito."
+    } else {
+      errorMessage += error.message
+    }
+
+    showAlert("usuarios-alert", errorMessage, "error")
+  }
 }
 
 // Modal functions
