@@ -4,6 +4,10 @@ const poolData = {
     ClientId: "4m4pllmlt8rtc8sul5nhnrnf0e",
 };
 
+// Configuração da API Gateway
+const API_BASE_URL =
+    "https://d5p7mnyje4.execute-api.us-east-1.amazonaws.com/v1"; // Substitua pela sua URL da API
+
 // ================================================================================
 // Variáveis de controle de fluxo do cognito:
 const userPool = new AmazonCognitoIdentity.CognitoUserPool(poolData);
@@ -15,67 +19,65 @@ let pendingAction = null;
 // ================================================================================
 // Dados simulados para demonstração (arquivos "materiais.json" e "movimentacoes.json"):
 let materiais = [];
-carregarDadosJSON("./materiais.json").then((dados) => {
-    materiais = dados;
-});
+// carregarDadosJSON("./materiais.json").then((dados) => {
+//     materiais = dados;
+// });
 
 let movimentacoes = [];
 // carregarDadosJSON('./movimentacoes.json').then(dados => {
 //     movimentacoes = dados;
 // })
 
-let usuarios = [];
+const usuarios = [];
 // carregarDadosJSON('./usuarios.json').then(dados => {
 //     usuarios = dados;
 // })
 
 // ================================================================================
 // Funções de persistência de dados (temporário, enquanto eu não integrar o backend):
-function saveDataToStorage() {
-    try {
-        localStorage.setItem(
-            "laboratorio_materiais",
-            JSON.stringify(materiais)
-        );
-        localStorage.setItem(
-            "laboratorio_movimentacoes",
-            JSON.stringify(movimentacoes)
-        );
-        console.log("Dados salvos no localStorage");
-    } catch (error) {
-        console.error("Erro ao salvar dados:", error);
-    }
+
+// Substituir as funções de persistência local por chamadas à API
+async function saveDataToStorage() {
+    // Esta função não é mais necessária com API
+    console.log("Dados salvos via API");
 }
 
-function loadDataFromStorage() {
+async function loadDataFromStorage() {
     try {
-        const savedMateriais = localStorage.getItem("laboratorio_materiais");
-        const savedMovimentacoes = localStorage.getItem("laboratorio_movimentacoes");
-        const savedUsuarios = localStorage.getItem("laboratorio_usuarios");
+        console.log("teste: ");
+        console.log(currentUser)
+        // Carregar materiais da API
+        const materiaisResponse = await fetch(`${API_BASE_URL}/materiais`, {
+            method: "GET",
+            Authorization: `Bearer ${currentUser.getSignInUserSession().idToken.jwtToken}`
+        });
 
-        if (savedMateriais) {
-            materiais = JSON.parse(savedMateriais);
-            console.log("Materiais carregados:", materiais.length);
+        if (materiaisResponse.ok) {
+            materiais = await materiaisResponse.json();
+            console.log("Materiais carregados da API:", materiais.length);
         }
 
-        if (savedMovimentacoes) {
-            movimentacoes = JSON.parse(savedMovimentacoes);
-            console.log("Movimentações carregadas:", movimentacoes.length);
-        }
-
-        if (savedUsuarios) {
-            usuarios = JSON.parse(savedUsuarios);
-            console.log("Usuários carregados:", usuarios.length);
+        // Carregar movimentações da API
+        const movimentacoesResponse = await fetch(`${API_BASE_URL}/movimentacoes`, {
+            method: "GET",
+            Authorization: `Bearer ${currentUser.getSignInUserSession().idToken.jwtToken}`
+        });
+        if (movimentacoesResponse.ok) {
+            movimentacoes = await movimentacoesResponse.json();
+            console.log(
+                "Movimentações carregadas da API:",
+                movimentacoes.length
+            );
         }
     } catch (error) {
-        console.error("Erro ao carregar dados:", error);
+        console.error("Erro ao carregar dados da API:", error);
     }
 }
 
 function clearStorage() {
     localStorage.removeItem("laboratorio_materiais");
     localStorage.removeItem("laboratorio_movimentacoes");
-    localStorage.removeItem("laboratorio_usuarios")
+    localStorage.removeItem("laboratorio_usuarios");
     console.log("Dados limpos do localStorage");
 }
 
@@ -97,13 +99,13 @@ function navigate(hash) {
 // ================================================================================
 // Verificar autenticação e grupos:
 function checkAuth() {
-
     // Verificar se o usuário está autenticado:
     const cognitoUser = userPool.getCurrentUser();
 
     if (cognitoUser) {
         cognitoUser.getSession((err, session) => {
-            if (err) {  // retorna ao login
+            if (err) {
+                // retorna ao login
                 navigate("login");
                 return;
             }
@@ -164,7 +166,7 @@ function checkAuth() {
                     })
                     .catch((error) => {
                         console.error("Erro ao obter grupos:", error);
-                        
+
                         // Fallback: usar role baseado no email
                         cognitoUser.getUserAttributes((err, attributes) => {
                             if (!err && attributes) {
@@ -192,7 +194,7 @@ function checkAuth() {
                                 document.getElementById(
                                     "admin-name"
                                 ).textContent = userName;
-                                
+
                                 updateProfileInfo(
                                     emailAttr ? emailAttr.Value : "",
                                     userName
@@ -254,7 +256,7 @@ function updateProfileInfo(email, name) {
 // TELAS
 
 // Login:
-document.getElementById("login-form").addEventListener("submit", function (e) {
+document.getElementById("login-form").addEventListener("submit", (e) => {
     e.preventDefault();
 
     const email = document.getElementById("login-email").value;
@@ -280,18 +282,18 @@ document.getElementById("login-form").addEventListener("submit", function (e) {
     const cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
 
     cognitoUser.authenticateUser(authenticationDetails, {
-        onSuccess: function (result) {
+        onSuccess: (result) => {
             showLoading("login-loading", false);
             currentUser = cognitoUser;
 
             // Verificar grupos e redirecionar
             checkAuth();
         },
-        onFailure: function (err) {
+        onFailure: (err) => {
             showLoading("login-loading", false);
             showAlert("login-alert", "Erro no login: " + err.message, "error");
         },
-        newPasswordRequired: function (userAttributes, requiredAttributes) {
+        newPasswordRequired: (userAttributes, requiredAttributes) => {
             showLoading("login-loading", false);
             showAlert(
                 "login-alert",
@@ -303,7 +305,7 @@ document.getElementById("login-form").addEventListener("submit", function (e) {
 });
 
 // Cadastro:
-document.getElementById("cadastro-form").addEventListener("submit", function (e) {
+document.getElementById("cadastro-form").addEventListener("submit", (e) => {
     e.preventDefault();
 
     const nome = document.getElementById("cadastro-nome").value;
@@ -336,50 +338,44 @@ document.getElementById("cadastro-form").addEventListener("submit", function (e)
     attributeList.push(attributeEmail);
     attributeList.push(attributeName);
 
-    userPool.signUp(
-        email,
-        password,
-        attributeList,
-        null,
-        function (err, result) {
-            showLoading("cadastro-loading", false);
+    userPool.signUp(email, password, attributeList, null, (err, result) => {
+        showLoading("cadastro-loading", false);
 
-            if (err) {
-                showAlert(
-                    "cadastro-alert",
-                    "Erro no cadastro: " + err.message,
-                    "error"
-                );
-                return;
-            }
-
-            // Adicionar usuário à lista local
-            usuarios.push({
-                email: email,
-                nome: nome,
-                status: "Pendente",
-                ultimoAcesso: "Nunca",
-                movimentacoesAtivas: 0,
-            });
-            saveDataToStorage();
-
-            pendingConfirmationEmail = email;
+        if (err) {
             showAlert(
                 "cadastro-alert",
-                "Cadastro realizado! Verifique seu email para o código de confirmação.",
-                "success"
+                "Erro no cadastro: " + err.message,
+                "error"
             );
-            
-            // Direciona para a tela de confirmação:
-            setTimeout(() => {
-                navigate("confirmacao");
-            }, 2000);
+            return;
         }
-    );
+
+        // Adicionar usuário à lista local
+        usuarios.push({
+            email: email,
+            nome: nome,
+            status: "Pendente",
+            ultimoAcesso: "Nunca",
+            movimentacoesAtivas: 0,
+        });
+        saveDataToStorage();
+
+        pendingConfirmationEmail = email;
+        showAlert(
+            "cadastro-alert",
+            "Cadastro realizado! Verifique seu email para o código de confirmação.",
+            "success"
+        );
+
+        // Direciona para a tela de confirmação:
+        setTimeout(() => {
+            navigate("confirmacao");
+        }, 2000);
+    });
 });
 
 // Confirmação:
-document.getElementById("confirmacao-form").addEventListener("submit", function (e) {
+document.getElementById("confirmacao-form").addEventListener("submit", (e) => {
     e.preventDefault();
 
     const codigo = document.getElementById("confirmacao-codigo").value;
@@ -403,7 +399,7 @@ document.getElementById("confirmacao-form").addEventListener("submit", function 
 
     const cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
 
-    cognitoUser.confirmRegistration(codigo, true, function (err, result) {
+    cognitoUser.confirmRegistration(codigo, true, (err, result) => {
         showLoading("confirmacao-loading", false);
 
         if (err) {
@@ -452,7 +448,7 @@ function reenviarCodigo() {
 
     const cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
 
-    cognitoUser.resendConfirmationCode(function (err, result) {
+    cognitoUser.resendConfirmationCode((err, result) => {
         if (err) {
             showAlert(
                 "confirmacao-alert",
@@ -568,7 +564,7 @@ function loadMovimentacoes() {
         const row = document.createElement("tr");
         const statusClass =
             mov.status === "Devolvido" ? "status-returned" : "status-active";
-            
+
         row.innerHTML = `
             <td>${new Date(mov.data).toLocaleDateString("pt-BR")}</td>
             <td>${mov.usuario}</td>
@@ -638,49 +634,61 @@ function loadHistoricoUsuario() {
 // Carregar usuários (admin)
 // Carregar usuários diretamente do Cognito (admin)
 async function loadUsuarios() {
-  const tbody = document.getElementById("usuarios-tbody")
-  tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #666;">Carregando usuários...</td></tr>'
+    const tbody = document.getElementById("usuarios-tbody");
+    tbody.innerHTML =
+        '<tr><td colspan="6" style="text-align: center; color: #666;">Carregando usuários...</td></tr>';
 
-  try {
-    // Buscar usuários do Cognito
-    const params = {
-      UserPoolId: poolData.UserPoolId,
-      Limit: 60, // Máximo de usuários por página
-    }
+    try {
+        // Buscar usuários do Cognito
+        const params = {
+            UserPoolId: poolData.UserPoolId,
+            Limit: 60, // Máximo de usuários por página
+        };
 
-    const result = await cognitoIdentityServiceProvider.listUsers(params).promise()
-    tbody.innerHTML = ""
+        const result = await cognitoIdentityServiceProvider
+            .listUsers(params)
+            .promise();
+        tbody.innerHTML = "";
 
-    if (result.Users.length === 0) {
-      tbody.innerHTML =
-        '<tr><td colspan="6" style="text-align: center; color: #666;">Nenhum usuário encontrado</td></tr>'
-      return
-    }
+        if (result.Users.length === 0) {
+            tbody.innerHTML =
+                '<tr><td colspan="6" style="text-align: center; color: #666;">Nenhum usuário encontrado</td></tr>';
+            return;
+        }
 
-    // Processar cada usuário
-    for (const user of result.Users) {
-      const email = user.Attributes.find((attr) => attr.Name === "email")?.Value || "N/A"
-      const name = user.Attributes.find((attr) => attr.Name === "name")?.Value || email
-      const status =
-        user.UserStatus === "CONFIRMED"
-          ? "Confirmado"
-          : user.UserStatus === "UNCONFIRMED"
-            ? "Pendente"
-            : user.UserStatus
+        // Processar cada usuário
+        for (const user of result.Users) {
+            const email =
+                user.Attributes.find((attr) => attr.Name === "email")?.Value ||
+                "N/A";
+            const name =
+                user.Attributes.find((attr) => attr.Name === "name")?.Value ||
+                email;
+            const status =
+                user.UserStatus === "CONFIRMED"
+                    ? "Confirmado"
+                    : user.UserStatus === "UNCONFIRMED"
+                    ? "Pendente"
+                    : user.UserStatus;
 
-      // Contar movimentações ativas
-      const activeMovements = movimentacoes.filter(
-        (mov) => (mov.usuario === name || mov.usuario === email) && mov.status === "Em uso",
-      ).length
+            // Contar movimentações ativas
+            const activeMovements = movimentacoes.filter(
+                (mov) =>
+                    (mov.usuario === name || mov.usuario === email) &&
+                    mov.status === "Em uso"
+            ).length;
 
-      const lastLogin = user.UserLastModifiedDate
-        ? new Date(user.UserLastModifiedDate).toLocaleDateString("pt-BR")
-        : "Nunca"
+            const lastLogin = user.UserLastModifiedDate
+                ? new Date(user.UserLastModifiedDate).toLocaleDateString(
+                      "pt-BR"
+                  )
+                : "Nunca";
 
-      const row = document.createElement("tr")
-      const statusClass = status === "Confirmado" ? "status-confirmed" : "status-pending"
+            const row = document.createElement("tr");
+            const statusClass =
+                status === "Confirmado" ? "status-confirmed" : "status-pending";
 
-      row.innerHTML = `
+            row.innerHTML = `
                 <td>${name}</td>
                 <td>${email}</td>
                 <td><span class="status-badge ${statusClass}">${status}</span></td>
@@ -688,151 +696,189 @@ async function loadUsuarios() {
                 <td>${lastLogin}</td>
                 <td>
                     ${
-                      activeMovements === 0 && email !== currentUser?.getUsername()
-                        ? `<button class="btn-danger" onclick="deleteUserFromCognito('${email}', '${name}')">Excluir</button>`
-                        : activeMovements > 0
-                          ? '<span style="color: #666;">Tem materiais pendentes</span>'
-                          : '<span style="color: #666;">Usuário atual</span>'
+                        activeMovements === 0 &&
+                        email !== currentUser?.getUsername()
+                            ? `<button class="btn-danger" onclick="deleteUserFromCognito('${email}', '${name}')">Excluir</button>`
+                            : activeMovements > 0
+                            ? '<span style="color: #666;">Tem materiais pendentes</span>'
+                            : '<span style="color: #666;">Usuário atual</span>'
                     }
                 </td>
-            `
-      tbody.appendChild(row)
-    }
-  } catch (error) {
-    console.error("Erro ao carregar usuários:", error)
-    tbody.innerHTML =
-      '<tr><td colspan="6" style="text-align: center; color: #f00;">Erro ao carregar usuários. Verifique as permissões.</td></tr>'
+            `;
+            tbody.appendChild(row);
+        }
+    } catch (error) {
+        console.error("Erro ao carregar usuários:", error);
+        tbody.innerHTML =
+            '<tr><td colspan="6" style="text-align: center; color: #f00;">Erro ao carregar usuários. Verifique as permissões.</td></tr>';
 
-    if (error.code === "NotAuthorizedException") {
-      showAlert(
-        "usuarios-alert",
-        "Erro: Sem permissão para listar usuários. Configure as credenciais de administrador.",
-        "error",
-      )
-    } else {
-      showAlert("usuarios-alert", `Erro ao carregar usuários: ${error.message}`, "error")
+        if (error.code === "NotAuthorizedException") {
+            showAlert(
+                "usuarios-alert",
+                "Erro: Sem permissão para listar usuários. Configure as credenciais de administrador.",
+                "error"
+            );
+        } else {
+            showAlert(
+                "usuarios-alert",
+                `Erro ao carregar usuários: ${error.message}`,
+                "error"
+            );
+        }
     }
-  }
 }
-// Cadastrar material (admin):
-document.getElementById("material-form").addEventListener("submit", function (e) {
-    e.preventDefault();
 
-    const nome = document.getElementById("material-nome").value;
-    const categoria = document.getElementById("material-categoria").value;
-    const quantidade = parseInt(
-        document.getElementById("material-quantidade").value
-    );
-    const unidade = document.getElementById("material-unidade").value;
-    const descricao = document.getElementById("material-descricao").value;
+// Atualizar função de cadastrar material para usar API
+document.getElementById("material-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
 
-    const novoMaterial = {
-        id: Date.now(), // Usar timestamp para ID único
-        nome,
-        categoria,
-        quantidade,
-        unidade,
-        descricao,
-    };
-
-    materiais.push(novoMaterial);
-    saveDataToStorage(); // Salvar dados
-
-    showAlert(
-        "cadastrar-alert",
-        "Material cadastrado com sucesso!",
-        "success"
-    );
-    document.getElementById("material-form").reset();
-
-    loadEstoque();
-    loadMateriais(); // Atualizar lista de materiais para usuários
-});
-
-// Registrar retirada:
-document.getElementById("retirada-form").addEventListener("submit", function (e) {
-    e.preventDefault();
-
-    const materialId = parseInt(
-        document.getElementById("material-select").value
-    );
-    const quantidade = parseInt(
-        document.getElementById("quantidade-retirada").value
-    );
-    const finalidade = document.getElementById("finalidade").value;
-    const tempoUso = parseInt(document.getElementById("tempo-uso").value);
-    const observacoes = document.getElementById("observacoes").value;
-
-    const material = materiais.find((m) => m.id === materialId);
-
-    if (!material) {
-        showAlert("retirada-alert", "Material não encontrado.", "error");
-        return;
-    }
-
-    if (quantidade > material.quantidade) {
-        showAlert(
-            "retirada-alert",
-            "Quantidade solicitada maior que disponível em estoque.",
-            "error"
+        const nome = document.getElementById("material-nome").value;
+        const categoria = document.getElementById("material-categoria").value;
+        const quantidade = Number.parseInt(
+            document.getElementById("material-quantidade").value
         );
-        return;
-    }
+        const unidade = document.getElementById("material-unidade").value;
+        const descricao = document.getElementById("material-descricao").value;
 
-    // Atualizar estoque
-    material.quantidade -= quantidade;
+        const novoMaterial = {
+            nome,
+            categoria,
+            quantidade,
+            unidade,
+            descricao,
+        };
 
-    // Adicionar movimentação
-    const userName = document.getElementById("user-name").textContent;
-    const novaMovimentacao = {
-        id: Date.now(), // Usar timestamp para ID único
-        data: new Date().toISOString().split("T")[0],
-        usuario: document.getElementById("user-name").textContent,
-        material: material.nome,
-        quantidade,
-        finalidade,
-        status: "Em uso",
-        observacoes: observacoes || "",
-        tempoUso: tempoUso,
-    };
+        try {
+            const response = await fetch(`${API_BASE_URL}/materiais`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${currentUser.getSignInUserSession().idToken.jwtToken}`,
+                },
+                body: JSON.stringify(novoMaterial),
+            });
 
-    movimentacoes.push(novaMovimentacao);
+            if (response.ok) {
+                const materialCriado = await response.json();
+                materiais.push(materialCriado);
 
-    // Atualizar contador de movimentações ativas do usuário
-    const usuario = usuarios.find((u) => u.nome === userName);
-    if (usuario) {
-        usuario.movimentacoesAtivas++;
-    }
+                showAlert(
+                    "cadastrar-alert",
+                    "Material cadastrado com sucesso!",
+                    "success"
+                );
+                document.getElementById("material-form").reset();
 
-    saveDataToStorage(); // Salvar dados
+                loadEstoque();
+                loadMateriais();
+            } else {
+                throw new Error("Erro ao cadastrar material");
+            }
+        } catch (error) {
+            console.error("Erro ao cadastrar material:", error);
+            showAlert(
+                "cadastrar-alert",
+                "Erro ao cadastrar material. Tente novamente.",
+                "error"
+            );
+        }
+    });
 
-    console.log("Nova movimentação registrada:", novaMovimentacao);
-    console.log("Total de movimentações:", movimentacoes.length);
+// Atualizar função de registrar retirada para usar API
+document.getElementById("retirada-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
 
-    showAlert(
-        "retirada-alert",
-        "Retirada registrada com sucesso!",
-        "success"
-    );
-    document.getElementById("retirada-form").reset();
+        const materialId = Number.parseInt(
+            document.getElementById("material-select").value
+        );
+        const quantidade = Number.parseInt(
+            document.getElementById("quantidade-retirada").value
+        );
+        const finalidade = document.getElementById("finalidade").value;
+        const tempoUso = Number.parseInt(
+            document.getElementById("tempo-uso").value
+        );
+        const observacoes = document.getElementById("observacoes").value;
 
-    loadMateriais();
-    loadHistoricoUsuario();
-    updateProfileInfo(
-        document.getElementById("profile-email").textContent,
-        userName
-    );
+        const material = materiais.find((m) => m.id === materialId);
 
-    // Se for admin, atualizar também as visualizações de admin
-    if (userRole === "admin") {
-        loadEstoque();
-        loadMovimentacoes();
-        loadUsuarios();
-    }
-});
+        if (!material) {
+            showAlert("retirada-alert", "Material não encontrado.", "error");
+            return;
+        }
 
-// Devolver material
-function returnMaterial(movimentacaoId) {
+        if (quantidade > material.quantidade) {
+            showAlert(
+                "retirada-alert",
+                "Quantidade solicitada maior que disponível em estoque.",
+                "error"
+            );
+            return;
+        }
+
+        const userName = document.getElementById("user-name").textContent;
+        const novaMovimentacao = {
+            usuario: userName,
+            materialId: materialId,
+            materialNome: material.nome,
+            quantidade,
+            finalidade,
+            observacoes: observacoes || "",
+            tempoUso: tempoUso,
+        };
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/movimentacoes`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${currentUser.getSignInUserSession().idToken.jwtToken}`,
+                },
+                body: JSON.stringify(novaMovimentacao),
+            });
+
+            if (response.ok) {
+                const movimentacaoCriada = await response.json();
+
+                // Atualizar dados locais
+                movimentacoes.push(movimentacaoCriada);
+
+                // Atualizar estoque local
+                material.quantidade -= quantidade;
+
+                showAlert(
+                    "retirada-alert",
+                    "Retirada registrada com sucesso!",
+                    "success"
+                );
+                document.getElementById("retirada-form").reset();
+
+                loadMateriais();
+                loadHistoricoUsuario();
+                updateProfileInfo(
+                    document.getElementById("profile-email").textContent,
+                    userName
+                );
+
+                if (userRole === "admin") {
+                    loadEstoque();
+                    loadMovimentacoes();
+                }
+            } else {
+                throw new Error("Erro ao registrar retirada");
+            }
+        } catch (error) {
+            console.error("Erro ao registrar retirada:", error);
+            showAlert(
+                "retirada-alert",
+                "Erro ao registrar retirada. Tente novamente.",
+                "error"
+            );
+        }
+    });
+
+// Atualizar função de devolver material para usar API
+async function returnMaterial(movimentacaoId) {
     const movimentacao = movimentacoes.find((m) => m.id === movimentacaoId);
     if (!movimentacao) {
         alert("Movimentação não encontrada.");
@@ -844,7 +890,6 @@ function returnMaterial(movimentacaoId) {
         return;
     }
 
-    // Confirmar devolução
     if (
         !confirm(
             `Confirmar devolução de ${movimentacao.quantidade} ${movimentacao.material}?`
@@ -853,38 +898,58 @@ function returnMaterial(movimentacaoId) {
         return;
     }
 
-    // Atualizar status da movimentação
-    movimentacao.status = "Devolvido";
-
-    // Devolver material ao estoque
-    const material = materiais.find((m) => m.nome === movimentacao.material);
-    if (material) {
-        material.quantidade += movimentacao.quantidade;
-    }
-
-    // Atualizar contador de movimentações ativas do usuário
-    const usuario = usuarios.find((u) => u.nome === movimentacao.usuario);
-    if (usuario && usuario.movimentacoesAtivas > 0) {
-        usuario.movimentacoesAtivas--;
-    }
-
-    saveDataToStorage();
-
-    // Recarregar dados
-    if (userRole === "admin") {
-        loadEstoque();
-        loadMovimentacoes();
-        loadUsuarios();
-    } else {
-        loadMateriais();
-        loadHistoricoUsuario();
-        updateProfileInfo(
-            document.getElementById("profile-email").textContent,
-            document.getElementById("user-name").textContent
+    try {
+        const response = await fetch(
+            `${API_BASE_URL}/movimentacoes/${movimentacaoId}/devolver`,
+            {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${currentUser.getSignInUserSession().idToken.jwtToken}`,
+                },
+            }
         );
-    }
 
-    alert("Material devolvido com sucesso!");
+        if (response.ok) {
+            const movimentacaoAtualizada = await response.json();
+
+            // Atualizar dados locais
+            const index = movimentacoes.findIndex(
+                (m) => m.id === movimentacaoId
+            );
+            if (index > -1) {
+                movimentacoes[index] = movimentacaoAtualizada;
+            }
+
+            // Atualizar estoque local
+            const material = materiais.find(
+                (m) => m.nome === movimentacao.material
+            );
+            if (material) {
+                material.quantidade += movimentacao.quantidade;
+            }
+
+            // Recarregar dados
+            if (userRole === "admin") {
+                loadEstoque();
+                loadMovimentacoes();
+            } else {
+                loadMateriais();
+                loadHistoricoUsuario();
+                updateProfileInfo(
+                    document.getElementById("profile-email").textContent,
+                    document.getElementById("user-name").textContent
+                );
+            }
+
+            alert("Material devolvido com sucesso!");
+        } else {
+            throw new Error("Erro ao devolver material");
+        }
+    } catch (error) {
+        console.error("Erro ao devolver material:", error);
+        alert("Erro ao devolver material. Tente novamente.");
+    }
 }
 
 // Deletar conta do usuário
@@ -918,114 +983,137 @@ function deleteUserAccount() {
         "⚠️ Excluir Conta",
         "Tem certeza que deseja excluir sua conta? Esta ação não pode ser desfeita.",
         "<strong>Consequências:</strong><br>• Sua conta será permanentemente removida<br>• Você perderá acesso ao sistema<br>• Seu histórico será mantido para fins de auditoria",
-        () => executeDeleteAccount(userEmail, userName)
+        () => executeSelfDeleteAccount(userEmail, userName)
     );
 }
 
 // Deletar usuário:
 async function executeSelfDeleteAccount(email, nome) {
-  try {
-    showAlert("perfil-alert", "Excluindo conta...", "info")
+    try {
+        showAlert("perfil-alert", "Excluindo conta...", "info");
 
-    // Usuário pode deletar a própria conta
-    await currentUser.deleteUser((err, result) => {
-      if (err) {
-        console.error("Erro ao excluir própria conta:", err)
-        showAlert("perfil-alert", `Erro ao excluir conta: ${err.message}`, "error")
-        return
-      }
+        // Usuário pode deletar a própria conta
+        await currentUser.deleteUser((err, result) => {
+            if (err) {
+                console.error("Erro ao excluir própria conta:", err);
+                showAlert(
+                    "perfil-alert",
+                    `Erro ao excluir conta: ${err.message}`,
+                    "error"
+                );
+                return;
+            }
 
-      // Marcar movimentações como de usuário excluído
-      movimentacoes.forEach((mov) => {
-        if (mov.usuario === nome || mov.usuario === email) {
-          mov.usuarioExcluido = true
-        }
-      })
+            // Marcar movimentações como de usuário excluído
+            movimentacoes.forEach((mov) => {
+                if (mov.usuario === nome || mov.usuario === email) {
+                    mov.usuarioExcluido = true;
+                }
+            });
 
-      saveDataToStorage()
+            saveDataToStorage();
 
-      showAlert("perfil-alert", "Conta excluída com sucesso. Você será desconectado.", "success")
+            showAlert(
+                "perfil-alert",
+                "Conta excluída com sucesso. Você será desconectado.",
+                "success"
+            );
 
-      setTimeout(() => {
-        logout()
-      }, 2000)
-    })
-  } catch (error) {
-    console.error("Erro ao excluir própria conta:", error)
-    showAlert("perfil-alert", "Erro ao excluir conta. Tente novamente.", "error")
-  }
+            setTimeout(() => {
+                logout();
+            }, 2000);
+        });
+    } catch (error) {
+        console.error("Erro ao excluir própria conta:", error);
+        showAlert(
+            "perfil-alert",
+            "Erro ao excluir conta. Tente novamente.",
+            "error"
+        );
+    }
 }
 
 // Deletar usuário do Cognito
 async function deleteUserFromCognito(email, nome) {
-  // Verificar se há movimentações pendentes
-  const activeMovements = movimentacoes.filter(
-    (mov) => (mov.usuario === nome || mov.usuario === email) && mov.status === "Em uso",
-  )
+    // Verificar se há movimentações pendentes
+    const activeMovements = movimentacoes.filter(
+        (mov) =>
+            (mov.usuario === nome || mov.usuario === email) &&
+            mov.status === "Em uso"
+    );
 
-  if (activeMovements.length > 0) {
-    showModal(
-      "Não é possível excluir usuário",
-      `O usuário ${nome} possui materiais que ainda não foram devolvidos.`,
-      `<strong>Materiais pendentes:</strong>
+    if (activeMovements.length > 0) {
+        showModal(
+            "Não é possível excluir usuário",
+            `O usuário ${nome} possui materiais que ainda não foram devolvidos.`,
+            `<strong>Materiais pendentes:</strong>
             <ul>
-                ${activeMovements.map((mov) => `<li>${mov.material} (${mov.quantidade})</li>`).join("")}
+                ${activeMovements
+                    .map(
+                        (mov) => `<li>${mov.material} (${mov.quantidade})</li>`
+                    )
+                    .join("")}
             </ul>`,
-      null,
-    )
-    return
-  }
+            null
+        );
+        return;
+    }
 
-  showModal(
-    "⚠️ Excluir Usuário",
-    `Tem certeza que deseja excluir o usuário ${nome}?`,
-    "<strong>Consequências:</strong><br>• A conta será permanentemente removida do Cognito<br>• O usuário perderá acesso ao sistema<br>• O histórico será mantido para fins de auditoria",
-    () => executeDeleteUserFromCognito(email, nome),
-  )
+    showModal(
+        "⚠️ Excluir Usuário",
+        `Tem certeza que deseja excluir o usuário ${nome}?`,
+        "<strong>Consequências:</strong><br>• A conta será permanentemente removida do Cognito<br>• O usuário perderá acesso ao sistema<br>• O histórico será mantido para fins de auditoria",
+        () => executeDeleteUserFromCognito(email, nome)
+    );
 }
 
 // Executar exclusão real do usuário no Cognito
 async function executeDeleteUserFromCognito(email, nome) {
-  try {
-    showAlert("usuarios-alert", "Excluindo usuário...", "info")
+    try {
+        showAlert("usuarios-alert", "Excluindo usuário...", "info");
 
-    const params = {
-      UserPoolId: poolData.UserPoolId,
-      Username: email,
+        const params = {
+            UserPoolId: poolData.UserPoolId,
+            Username: email,
+        };
+
+        await cognitoIdentityServiceProvider.adminDeleteUser(params).promise();
+
+        // Remover das movimentações locais (manter histórico mas marcar como usuário excluído)
+        movimentacoes.forEach((mov) => {
+            if (mov.usuario === nome || mov.usuario === email) {
+                mov.usuarioExcluido = true;
+            }
+        });
+
+        saveDataToStorage();
+
+        showAlert(
+            "usuarios-alert",
+            `Usuário ${nome} excluído com sucesso do Cognito.`,
+            "success"
+        );
+
+        // Recarregar lista de usuários
+        setTimeout(() => {
+            loadUsuarios();
+        }, 1000);
+    } catch (error) {
+        console.error("Erro ao excluir usuário do Cognito:", error);
+
+        let errorMessage = "Erro ao excluir usuário. ";
+
+        if (error.code === "NotAuthorizedException") {
+            errorMessage +=
+                "Sem permissão para excluir usuários. Configure as credenciais de administrador.";
+        } else if (error.code === "UserNotFoundException") {
+            errorMessage += "Usuário não encontrado no Cognito.";
+        } else {
+            errorMessage += error.message;
+        }
+
+        showAlert("usuarios-alert", errorMessage, "error");
     }
-
-    await cognitoIdentityServiceProvider.adminDeleteUser(params).promise()
-
-    // Remover das movimentações locais (manter histórico mas marcar como usuário excluído)
-    movimentacoes.forEach((mov) => {
-      if (mov.usuario === nome || mov.usuario === email) {
-        mov.usuarioExcluido = true
-      }
-    })
-
-    saveDataToStorage()
-
-    showAlert("usuarios-alert", `Usuário ${nome} excluído com sucesso do Cognito.`, "success")
-
-    // Recarregar lista de usuários
-    setTimeout(() => {
-      loadUsuarios()
-    }, 1000)
-  } catch (error) {
-    console.error("Erro ao excluir usuário do Cognito:", error)
-
-    let errorMessage = "Erro ao excluir usuário. "
-
-    if (error.code === "NotAuthorizedException") {
-      errorMessage += "Sem permissão para excluir usuários. Configure as credenciais de administrador."
-    } else if (error.code === "UserNotFoundException") {
-      errorMessage += "Usuário não encontrado no Cognito."
-    } else {
-      errorMessage += error.message
-    }
-
-    showAlert("usuarios-alert", errorMessage, "error")
-  }
 }
 
 // Modal functions
@@ -1058,6 +1146,7 @@ function confirmAction() {
     }
     closeModal();
 }
+
 // ================================================================================
 // FUNÇÕES AUXILIARES:
 
@@ -1080,33 +1169,44 @@ function showLoading(elementId, show) {
 }
 
 // Função de debug
-// Função de debug
 function debugData() {
-  console.log("=== DEBUG DE DADOS ===")
-  console.log("Usuário atual:", currentUser ? currentUser.getUsername() : "Nenhum")
-  console.log("Role do usuário:", userRole)
-  console.log("Total de materiais:", materiais.length)
-  console.log("Materiais:", materiais)
-  console.log("Total de movimentações:", movimentacoes.length)
-  console.log("Movimentações:", movimentacoes)
-  console.log("Total de usuários:", usuarios.length)
-  console.log("Usuários:", usuarios)
-  console.log("LocalStorage materiais:", localStorage.getItem("laboratorio_materiais"))
-  console.log("LocalStorage movimentações:", localStorage.getItem("laboratorio_movimentacoes"))
-  console.log("LocalStorage usuários:", localStorage.getItem("laboratorio_usuarios"))
+    console.log("=== DEBUG DE DADOS ===");
+    console.log(
+        "Usuário atual:",
+        currentUser ? currentUser.getUsername() : "Nenhum"
+    );
+    console.log("Role do usuário:", userRole);
+    console.log("Total de materiais:", materiais.length);
+    console.log("Materiais:", materiais);
+    console.log("Total de movimentações:", movimentacoes.length);
+    console.log("Movimentações:", movimentacoes);
+    console.log("Total de usuários:", usuarios.length);
+    console.log("Usuários:", usuarios);
+    console.log(
+        "LocalStorage materiais:",
+        localStorage.getItem("laboratorio_materiais")
+    );
+    console.log(
+        "LocalStorage movimentações:",
+        localStorage.getItem("laboratorio_movimentacoes")
+    );
+    console.log(
+        "LocalStorage usuários:",
+        localStorage.getItem("laboratorio_usuarios")
+    );
 
-  alert(`Debug concluído! Verifique o console do navegador.
+    alert(`Debug concluído! Verifique o console do navegador.
     
 Resumo:
 - Materiais: ${materiais.length}
 - Movimentações: ${movimentacoes.length}
 - Usuários: ${usuarios.length}
 - Role: ${userRole}
-- Usuário: ${currentUser ? currentUser.getUsername() : "Nenhum"}`)
+- Usuário: ${currentUser ? currentUser.getUsername() : "Nenhum"}`);
 }
 
 // Inicialização:
-window.addEventListener("load", function () {
+window.addEventListener("load", () => {
     // Carregar dados salvos
     loadDataFromStorage();
 
@@ -1119,7 +1219,7 @@ window.addEventListener("load", function () {
     }
 });
 
-window.addEventListener("hashchange", function () {
+window.addEventListener("hashchange", () => {
     const hash = window.location.hash;
 
     if (hash === "#login" || hash === "#cadastro" || hash === "#confirmacao") {
