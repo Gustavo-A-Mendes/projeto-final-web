@@ -49,7 +49,10 @@ async function loadDataFromStorage() {
         // Carregar materiais da API
         const materiaisResponse = await fetch(`${API_BASE_URL}/materiais`, {
             method: "GET",
-            Authorization: `Bearer ${currentUser.getSignInUserSession().idToken.jwtToken}`
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${currentUser.getSignInUserSession().idToken.jwtToken}`
+            }
         });
 
         if (materiaisResponse.ok) {
@@ -60,7 +63,10 @@ async function loadDataFromStorage() {
         // Carregar movimentações da API
         const movimentacoesResponse = await fetch(`${API_BASE_URL}/movimentacoes`, {
             method: "GET",
-            Authorization: `Bearer ${currentUser.getSignInUserSession().idToken.jwtToken}`
+            headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${currentUser.getSignInUserSession().idToken.jwtToken}`
+            }
         });
         if (movimentacoesResponse.ok) {
             movimentacoes = await movimentacoesResponse.json();
@@ -124,7 +130,7 @@ function checkAuth() {
                         console.log("Role determinado:", userRole);
 
                         // Obter atributos do usuário:
-                        cognitoUser.getUserAttributes((err, attributes) => {
+                        cognitoUser.getUserAttributes(async (err, attributes) => {
                             if (!err && attributes) {
                                 const emailAttr = attributes.find(
                                     (attr) => attr.Name === "email"
@@ -152,7 +158,7 @@ function checkAuth() {
                                 );
 
                                 // Forçar refresh dos dados:
-                                loadDataFromStorage();
+                                await loadDataFromStorage();
                             }
 
                             // Acesso ao dashboard designado ao grupo:
@@ -168,7 +174,7 @@ function checkAuth() {
                         console.error("Erro ao obter grupos:", error);
 
                         // Fallback: usar role baseado no email
-                        cognitoUser.getUserAttributes((err, attributes) => {
+                        cognitoUser.getUserAttributes(async (err, attributes) => {
                             if (!err && attributes) {
                                 const emailAttr = attributes.find(
                                     (attr) => attr.Name === "email"
@@ -200,7 +206,7 @@ function checkAuth() {
                                     userName
                                 );
 
-                                loadDataFromStorage();
+                                await loadDataFromStorage();
                                 navigate(
                                     userRole === "admin"
                                         ? "dashboard-admin"
@@ -499,6 +505,7 @@ function switchTab(tabName) {
 // Carregar dados do dashboard:
 function loadDashboardData() {
     if (userRole === "admin") {
+        console.log("to administrando")
         loadEstoque();
         loadMovimentacoes();
         loadUsuarios();
@@ -527,7 +534,6 @@ function loadMateriais() {
 function loadEstoque() {
     const tbody = document.getElementById("estoque-tbody");
     tbody.innerHTML = "";
-
     materiais.forEach((material) => {
         const row = document.createElement("tr");
         const status =
