@@ -572,22 +572,31 @@ function loadMovimentacoes() {
             mov.status === "Devolvido" ? "status-returned" : "status-active";
 
         row.innerHTML = `
-            <td>${new Date(mov.data).toLocaleDateString("pt-BR")}</td>
+            <td>${new Date(mov.criadoEm).toLocaleDateString("pt-BR")}</td>
             <td>${mov.usuario}</td>
-            <td>${mov.material}</td>
+            <td>${mov.materialNome}</td>
             <td>${mov.quantidade}</td>
             <td>${mov.finalidade}</td>
             <td><span class="status-badge ${statusClass}">${
             mov.status
         }</span></td>
-            <td>
-                ${
-                    mov.status === "Em uso"
-                        ? `<button class="btn-success" onclick="returnMaterial(${mov.id})">Devolver</button>`
-                        : '<span style="color: #666;">-</span>'
-                }
-            </td>
+            <td></td> <!-- célula do botão ou tracinho -->
         `;
+
+        // Cria e adiciona o botão apenas se o status for "Em uso"
+        if (mov.status === "Em uso") {
+            const button = document.createElement("button");
+            button.className = "btn-success";
+            button.textContent = "Devolver";
+            button.addEventListener("click", () => {
+                returnMaterial(mov.id);
+            });
+
+            row.lastElementChild.appendChild(button); // coloca na <td> vazia
+        } else {
+            row.lastElementChild.innerHTML = '<span style="color: #666;">-</span>';
+        }
+
         tbody.appendChild(row);
     });
 }
@@ -618,21 +627,30 @@ function loadHistoricoUsuario() {
             mov.status === "Devolvido" ? "status-returned" : "status-active";
 
         row.innerHTML = `
-            <td>${new Date(mov.data).toLocaleDateString("pt-BR")}</td>
-            <td>${mov.material}</td>
+            <td>${new Date(mov.criadoEm).toLocaleDateString("pt-BR")}</td>
+            <td>${mov.materialNome}</td>
             <td>${mov.quantidade}</td>
             <td>${mov.finalidade}</td>
             <td><span class="status-badge ${statusClass}">${
             mov.status
         }</span></td>
-            <td>
-                ${
-                    mov.status === "Em uso"
-                        ? `<button class="btn-success" onclick="returnMaterial(${mov.id})">Devolver</button>`
-                        : '<span style="color: #666;">-</span>'
-                }
-            </td>
+            <td></td> <!-- célula do botão ou tracinho -->
         `;
+
+        // Cria e adiciona o botão apenas se o status for "Em uso"
+        if (mov.status === "Em uso") {
+            const button = document.createElement("button");
+            button.className = "btn-success";
+            button.textContent = "Devolver";
+            button.addEventListener("click", () => {
+                returnMaterial(mov.id);
+            });
+
+            row.lastElementChild.appendChild(button); // coloca na <td> vazia
+        } else {
+            row.lastElementChild.innerHTML = '<span style="color: #666;">-</span>';
+        }
+
         tbody.appendChild(row);
     });
 }
@@ -898,7 +916,7 @@ async function returnMaterial(movimentacaoId) {
 
     if (
         !confirm(
-            `Confirmar devolução de ${movimentacao.quantidade} ${movimentacao.material}?`
+            `Confirmar devolução de ${movimentacao.quantidade} ${movimentacao.materialNome}?`
         )
     ) {
         return;
@@ -976,7 +994,7 @@ function deleteUserAccount() {
             <ul>
                 ${activeMovements
                     .map(
-                        (mov) => `<li>${mov.material} (${mov.quantidade})</li>`
+                        (mov) => `<li>${mov.materialNome} (${mov.quantidade})</li>`
                     )
                     .join("")}
             </ul>`,
@@ -1056,7 +1074,7 @@ async function deleteUserFromCognito(email, nome) {
             <ul>
                 ${activeMovements
                     .map(
-                        (mov) => `<li>${mov.material} (${mov.quantidade})</li>`
+                        (mov) => `<li>${mov.materialNome} (${mov.quantidade})</li>`
                     )
                     .join("")}
             </ul>`,
