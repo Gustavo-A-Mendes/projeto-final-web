@@ -1,7 +1,7 @@
 // Configuração do AWS Cognito:
 const poolData = {
-    UserPoolId: "us-east-1_lx4uauG61",
-    ClientId: "4m4pllmlt8rtc8sul5nhnrnf0e",
+    UserPoolId: "us-east-1_qnide3CSj",
+    ClientId: "2h6e0bg4lg9o3vd2ljljlnd1vj",
 };
 
 // Configuração da API Gateway
@@ -15,6 +15,7 @@ let currentUser = null;
 let userRole = null;
 let pendingConfirmationEmail = null;
 let pendingAction = null;
+let emailLogado = null;
 
 // ================================================================================
 // Dados simulados para demonstração (arquivos "materiais.json" e "movimentacoes.json"):
@@ -28,7 +29,7 @@ let movimentacoes = [];
 //     movimentacoes = dados;
 // })
 
-const usuarios = [];
+let usuarios = [];
 // carregarDadosJSON('./usuarios.json').then(dados => {
 //     usuarios = dados;
 // })
@@ -44,36 +45,64 @@ async function saveDataToStorage() {
 
 async function loadDataFromStorage() {
     try {
-        console.log("teste: ");
-        console.log(currentUser)
         // Carregar materiais da API
         const materiaisResponse = await fetch(`${API_BASE_URL}/materiais`, {
             method: "GET",
             headers: {
                 "Content-Type": "application/json",
-                "Authorization": `Bearer ${currentUser.getSignInUserSession().idToken.jwtToken}`
-            }
+                Authorization: `Bearer ${
+                    currentUser.getSignInUserSession().idToken.jwtToken
+                }`,
+                "X-Access-Token": `Bearer ${
+                    currentUser.getSignInUserSession().accessToken.jwtToken
+                }`
+            },
         });
-
+            
         if (materiaisResponse.ok) {
             materiais = await materiaisResponse.json();
             console.log("Materiais carregados da API:", materiais.length);
         }
 
         // Carregar movimentações da API
-        const movimentacoesResponse = await fetch(`${API_BASE_URL}/movimentacoes`, {
-            method: "GET",
-            headers: {
+        const movimentacoesResponse = await fetch(
+            `${API_BASE_URL}/movimentacoes`,
+            {
+                method: "GET",
+                headers: {
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer ${currentUser.getSignInUserSession().idToken.jwtToken}`
+                    Authorization: `Bearer ${
+                        currentUser.getSignInUserSession().idToken.jwtToken
+                    }`,
+                    "X-Access-Token": `Bearer ${
+                        currentUser.getSignInUserSession().accessToken.jwtToken
+                    }`
+                },
             }
-        });
+        );
         if (movimentacoesResponse.ok) {
             movimentacoes = await movimentacoesResponse.json();
             console.log(
                 "Movimentações carregadas da API:",
                 movimentacoes.length
             );
+        }
+        // Carregar usuários da API
+        const usuariosResponse = await fetch(`${API_BASE_URL}/usuarios`, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${
+                    currentUser.getSignInUserSession().idToken.jwtToken
+                }`,
+                "X-Access-Token": `Bearer ${
+                    currentUser.getSignInUserSession().accessToken.jwtToken
+                }`
+            },
+        });
+        if (usuariosResponse.ok) {
+            usuarios = await usuariosResponse.json();
+            console.log("Usuários carregados da API:", usuarios.length);
         }
     } catch (error) {
         console.error("Erro ao carregar dados da API:", error);
@@ -130,83 +159,41 @@ function checkAuth() {
                         console.log("Role determinado:", userRole);
 
                         // Obter atributos do usuário:
-                        cognitoUser.getUserAttributes(async (err, attributes) => {
-                            if (!err && attributes) {
-                                const emailAttr = attributes.find(
-                                    (attr) => attr.Name === "email"
-                                );
-                                const nameAttr = attributes.find(
-                                    (attr) => attr.Name === "name"
-                                );
-
-                                const userName = nameAttr
+                        cognitoUser.getUserAttributes(
+                            async (err, attributes) => {
+                                if (!err && attributes) {
+                                    const emailAttr = attributes.find(
+                                        (attr) => attr.Name === "email"
+                                    );
+                                    const nameAttr = attributes.find(
+                                        (attr) => attr.Name === "name"
+                                    );
+                                    
+                                    const userName = nameAttr
                                     ? nameAttr.Value
                                     : emailAttr
                                     ? emailAttr.Value
                                     : "Usuário";
-                                document.getElementById(
-                                    "user-name"
-                                ).textContent = userName;
-                                document.getElementById(
-                                    "admin-name"
-                                ).textContent = userName;
+                                    
+                                    document.getElementById(
+                                        "user-name"
+                                    ).textContent = userName;
+                                    document.getElementById(
+                                        "admin-name"
+                                    ).textContent = userName;
 
-                                // Atualizar informações do perfil
-                                updateProfileInfo(
-                                    emailAttr ? emailAttr.Value : "",
-                                    userName
-                                );
+                                    emailLogado = emailAttr.Value;
+                                    // Atualizar informações do perfil
+                                    updateProfileInfo(
+                                        emailAttr ? emailAttr.Value : "",
+                                        userName
+                                    );
 
-                                // Forçar refresh dos dados:
-                                await loadDataFromStorage();
-                            }
+                                    // Forçar refresh dos dados:
+                                    await loadDataFromStorage();
+                                }
 
-                            // Acesso ao dashboard designado ao grupo:
-                            navigate(
-                                userRole === "admin"
-                                    ? "dashboard-admin"
-                                    : "dashboard-user"
-                            );
-                            loadDashboardData();
-                        });
-                    })
-                    .catch((error) => {
-                        console.error("Erro ao obter grupos:", error);
-
-                        // Fallback: usar role baseado no email
-                        cognitoUser.getUserAttributes(async (err, attributes) => {
-                            if (!err && attributes) {
-                                const emailAttr = attributes.find(
-                                    (attr) => attr.Name === "email"
-                                );
-                                userRole =
-                                    emailAttr &&
-                                    emailAttr.Value.includes("admin")
-                                        ? "admin"
-                                        : "user";
-                                console.log("Role fallback:", userRole);
-
-                                const nameAttr = attributes.find(
-                                    (attr) => attr.Name === "name"
-                                );
-                                const userName = nameAttr
-                                    ? nameAttr.Value
-                                    : emailAttr
-                                    ? emailAttr.Value
-                                    : "Usuário";
-                                document.getElementById(
-                                    "user-name"
-                                ).textContent = userName;
-                                document.getElementById(
-                                    "admin-name"
-                                ).textContent = userName;
-
-                                updateProfileInfo(
-                                    emailAttr ? emailAttr.Value : "",
-                                    userName
-                                );
-
-                                await loadDataFromStorage();
+                                // Acesso ao dashboard designado ao grupo:
                                 navigate(
                                     userRole === "admin"
                                         ? "dashboard-admin"
@@ -214,7 +201,55 @@ function checkAuth() {
                                 );
                                 loadDashboardData();
                             }
-                        });
+                        );
+                    })
+                    .catch((error) => {
+                        console.error("Erro ao obter grupos:", error);
+
+                        // Fallback: usar role baseado no email
+                        cognitoUser.getUserAttributes(
+                            async (err, attributes) => {
+                                if (!err && attributes) {
+                                    const emailAttr = attributes.find(
+                                        (attr) => attr.Name === "email"
+                                    );
+                                    userRole =
+                                        emailAttr &&
+                                        emailAttr.Value.includes("admin")
+                                            ? "admin"
+                                            : "user";
+                                    console.log("Role fallback:", userRole);
+
+                                    const nameAttr = attributes.find(
+                                        (attr) => attr.Name === "name"
+                                    );
+                                    const userName = nameAttr
+                                        ? nameAttr.Value
+                                        : emailAttr
+                                        ? emailAttr.Value
+                                        : "Usuário";
+                                    document.getElementById(
+                                        `user-name`
+                                    ).textContent = userName;
+                                    document.getElementById(
+                                        "admin-name"
+                                    ).textContent = userName;
+
+                                    updateProfileInfo(
+                                        emailAttr ? emailAttr.Value : "",
+                                        userName
+                                    );
+
+                                    await loadDataFromStorage();
+                                    navigate(
+                                        userRole === "admin"
+                                            ? "dashboard-admin"
+                                            : "dashboard-user"
+                                    );
+                                    loadDashboardData();
+                                }
+                            }
+                        );
                     });
             } else {
                 navigate("login");
@@ -223,6 +258,55 @@ function checkAuth() {
     } else {
         navigate("login");
     }
+}
+
+// Atualiza os tokens de autenticação:
+function renovaTokens() {
+    const cognitoUser = userPool.getCurrentUser();
+
+    if (!cognitoUser) {
+        console.warn("Usuário não está logado.");
+        return;
+    }
+
+    cognitoUser.getSession(function (err, session) {
+        if (err) {
+            console.error("Erro ao obter sessão:", err);
+            return;
+        }
+
+        const exp = session.getAccessToken().getExpiration(); // timestamp (segundos)
+        const agora = Math.floor(Date.now() / 1000); // em segundos
+
+        const tempoRestante = exp - agora;
+
+        // Se faltar menos de 10 minutos para expirar, renova
+        if (tempoRestante < 600) {
+            console.log("Renovando token...");
+
+            const refreshToken = session.getRefreshToken();
+
+            cognitoUser.refreshSession(
+                refreshToken,
+                function (err, novaSessao) {
+                    if (err) {
+                        console.error("Erro ao renovar sessão:", err);
+                        return;
+                    }
+
+                    console.log("Token renovado com sucesso.");
+                    // Aqui você pode armazenar os novos tokens se quiser
+                    const novoAccessToken = novaSessao
+                        .getAccessToken()
+                        .getJwtToken();
+                    const novoIdToken = novaSessao.getIdToken().getJwtToken();
+                    // Exemplo: localStorage.setItem("accessToken", novoAccessToken);
+                }
+            );
+        } else {
+            console.log("Token ainda válido por", tempoRestante, "segundos.");
+        }
+    });
 }
 
 // Função para obter grupos do usuário:
@@ -244,9 +328,9 @@ function getUserGroups(session) {
 
 // Atualizar informações do perfil
 function updateProfileInfo(email, name) {
-    document.getElementById("profile-name").textContent = name;
-    document.getElementById("profile-email").textContent = email;
-    document.getElementById("profile-role").textContent =
+    document.getElementById(`profile-name-${userRole}`).textContent = name;
+    document.getElementById(`profile-email-${userRole}`).textContent = email;
+    document.getElementById(`profile-role-${userRole}`).textContent =
         userRole === "admin" ? "Administrador" : "Usuário Comum";
 
     // Contar movimentações ativas do usuário
@@ -434,7 +518,8 @@ document.getElementById("confirmacao-form").addEventListener("submit", (e) => {
 
         // Redireciona para a tela de login:
         setTimeout(() => {
-            navigate("login");
+            checkAuth();
+            // navigate("login");
             pendingConfirmationEmail = null;
         }, 2000);
     });
@@ -477,6 +562,14 @@ function logout() {
     if (currentUser) {
         currentUser.signOut();
     }
+
+    // Limpar dados locais
+    localStorage.clear();
+    sessionStorage.clear();
+
+    // Limpar alertas
+    clearAlerts();
+
     currentUser = null;
     userRole = null;
     navigate("login");
@@ -505,7 +598,6 @@ function switchTab(tabName) {
 // Carregar dados do dashboard:
 function loadDashboardData() {
     if (userRole === "admin") {
-        console.log("to administrando")
         loadEstoque();
         loadMovimentacoes();
         loadUsuarios();
@@ -594,7 +686,8 @@ function loadMovimentacoes() {
 
             row.lastElementChild.appendChild(button); // coloca na <td> vazia
         } else {
-            row.lastElementChild.innerHTML = '<span style="color: #666;">-</span>';
+            row.lastElementChild.innerHTML =
+                '<span style="color: #666;">-</span>';
         }
 
         tbody.appendChild(row);
@@ -607,7 +700,7 @@ function loadHistoricoUsuario() {
     tbody.innerHTML = "";
 
     const userName = document.getElementById("user-name").textContent;
-    const userMovs = movimentacoes.filter((mov) => mov.usuario === userName);
+    const userMovs = movimentacoes.filter((mov) => mov.usuario.trim() === userName);
 
     console.log("Carregando histórico para:", userName);
     console.log("Movimentações encontradas:", userMovs.length);
@@ -648,7 +741,8 @@ function loadHistoricoUsuario() {
 
             row.lastElementChild.appendChild(button); // coloca na <td> vazia
         } else {
-            row.lastElementChild.innerHTML = '<span style="color: #666;">-</span>';
+            row.lastElementChild.innerHTML =
+                '<span style="color: #666;">-</span>';
         }
 
         tbody.appendChild(row);
@@ -663,25 +757,16 @@ async function loadUsuarios() {
         '<tr><td colspan="6" style="text-align: center; color: #666;">Carregando usuários...</td></tr>';
 
     try {
-        // Buscar usuários do Cognito
-        const params = {
-            UserPoolId: poolData.UserPoolId,
-            Limit: 60, // Máximo de usuários por página
-        };
-
-        const result = await cognitoIdentityServiceProvider
-            .listUsers(params)
-            .promise();
         tbody.innerHTML = "";
 
-        if (result.Users.length === 0) {
+        if (usuarios.length === 0) {
             tbody.innerHTML =
                 '<tr><td colspan="6" style="text-align: center; color: #666;">Nenhum usuário encontrado</td></tr>';
             return;
         }
 
         // Processar cada usuário
-        for (const user of result.Users) {
+        for (const user of usuarios) {
             const email =
                 user.Attributes.find((attr) => attr.Name === "email")?.Value ||
                 "N/A";
@@ -711,7 +796,7 @@ async function loadUsuarios() {
             const row = document.createElement("tr");
             const statusClass =
                 status === "Confirmado" ? "status-confirmed" : "status-pending";
-
+            
             row.innerHTML = `
                 <td>${name}</td>
                 <td>${email}</td>
@@ -721,7 +806,7 @@ async function loadUsuarios() {
                 <td>
                     ${
                         activeMovements === 0 &&
-                        email !== currentUser?.getUsername()
+                        email !== emailLogado
                             ? `<button class="btn-danger" onclick="deleteUserFromCognito('${email}', '${name}')">Excluir</button>`
                             : activeMovements > 0
                             ? '<span style="color: #666;">Tem materiais pendentes</span>'
@@ -777,7 +862,12 @@ document.getElementById("material-form").addEventListener("submit", async (e) =>
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    Authorization: `Bearer ${currentUser.getSignInUserSession().idToken.jwtToken}`,
+                    Authorization: `Bearer ${
+                        currentUser.getSignInUserSession().idToken.jwtToken
+                    }`,
+                    "X-Access-Token": `Bearer ${
+                        currentUser.getSignInUserSession().accessToken.jwtToken
+                    }`
                 },
                 body: JSON.stringify(novoMaterial),
             });
@@ -856,7 +946,12 @@ document.getElementById("retirada-form").addEventListener("submit", async (e) =>
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    Authorization: `Bearer ${currentUser.getSignInUserSession().idToken.jwtToken}`,
+                    Authorization: `Bearer ${
+                        currentUser.getSignInUserSession().idToken.jwtToken
+                    }`,
+                    "X-Access-Token": `Bearer ${
+                        currentUser.getSignInUserSession().accessToken.jwtToken
+                    }`
                 },
                 body: JSON.stringify(novaMovimentacao),
             });
@@ -880,7 +975,7 @@ document.getElementById("retirada-form").addEventListener("submit", async (e) =>
                 loadMateriais();
                 loadHistoricoUsuario();
                 updateProfileInfo(
-                    document.getElementById("profile-email").textContent,
+                    document.getElementById(`profile-email-${userRole}`).textContent,
                     userName
                 );
 
@@ -900,6 +995,8 @@ document.getElementById("retirada-form").addEventListener("submit", async (e) =>
             );
         }
     });
+
+// Atualizar 
 
 // Atualizar função de devolver material para usar API
 async function returnMaterial(movimentacaoId) {
@@ -929,7 +1026,12 @@ async function returnMaterial(movimentacaoId) {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
-                    Authorization: `Bearer ${currentUser.getSignInUserSession().idToken.jwtToken}`,
+                    Authorization: `Bearer ${
+                        currentUser.getSignInUserSession().idToken.jwtToken
+                    }`,
+                    "X-Access-Token": `Bearer ${
+                        currentUser.getSignInUserSession().accessToken.jwtToken
+                    }`
                 },
             }
         );
@@ -961,7 +1063,7 @@ async function returnMaterial(movimentacaoId) {
                 loadMateriais();
                 loadHistoricoUsuario();
                 updateProfileInfo(
-                    document.getElementById("profile-email").textContent,
+                    document.getElementById(`profile-email-${userRole}`).textContent,
                     document.getElementById("user-name").textContent
                 );
             }
@@ -979,7 +1081,7 @@ async function returnMaterial(movimentacaoId) {
 // Deletar conta do usuário
 function deleteUserAccount() {
     const userName = document.getElementById("user-name").textContent;
-    const userEmail = document.getElementById("profile-email").textContent;
+    const userEmail = document.getElementById(`profile-email-${userRole}`).textContent;
 
     // Verificar se há movimentações pendentes
     const activeMovements = movimentacoes.filter(
@@ -994,7 +1096,8 @@ function deleteUserAccount() {
             <ul>
                 ${activeMovements
                     .map(
-                        (mov) => `<li>${mov.materialNome} (${mov.quantidade})</li>`
+                        (mov) =>
+                            `<li>${mov.materialNome} (${mov.quantidade})</li>`
                     )
                     .join("")}
             </ul>`,
@@ -1016,37 +1119,47 @@ async function executeSelfDeleteAccount(email, nome) {
     try {
         showAlert("perfil-alert", "Excluindo conta...", "info");
 
-        // Usuário pode deletar a própria conta
-        await currentUser.deleteUser((err, result) => {
-            if (err) {
-                console.error("Erro ao excluir própria conta:", err);
-                showAlert(
-                    "perfil-alert",
-                    `Erro ao excluir conta: ${err.message}`,
-                    "error"
-                );
-                return;
-            }
+        const body = {
+            email: email // obrigatório só para admin
+        };
 
-            // Marcar movimentações como de usuário excluído
-            movimentacoes.forEach((mov) => {
-                if (mov.usuario === nome || mov.usuario === email) {
-                    mov.usuarioExcluido = true;
-                }
-            });
-
-            saveDataToStorage();
-
-            showAlert(
-                "perfil-alert",
-                "Conta excluída com sucesso. Você será desconectado.",
-                "success"
-            );
-
-            setTimeout(() => {
-                logout();
-            }, 2000);
+        const res = await fetch(`${API_BASE_URL}/usuarios`, {
+            method: "DELETE",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${
+                    currentUser.getSignInUserSession().idToken.jwtToken
+                }`,
+                "X-Access-Token": `Bearer ${
+                    currentUser.getSignInUserSession().accessToken.jwtToken
+                }`
+            },
+            body: JSON.stringify(body)
         });
+
+        const data = await res.json();  // retorno da API
+        console.log(data);
+
+        // Marcar movimentações como de usuário excluído
+        movimentacoes.forEach((mov) => {
+            if (mov.usuario === nome || mov.usuario === email) {
+                mov.usuarioExcluido = true;
+            }
+        });
+
+        await saveDataToStorage();
+        await loadDataFromStorage();
+
+        showAlert(
+            "perfil-alert",
+            "Conta excluída com sucesso. Você será desconectado.",
+            "success"
+        );
+
+        setTimeout(() => {
+            logout();
+        }, 2000);
+
     } catch (error) {
         console.error("Erro ao excluir própria conta:", error);
         showAlert(
@@ -1074,7 +1187,8 @@ async function deleteUserFromCognito(email, nome) {
             <ul>
                 ${activeMovements
                     .map(
-                        (mov) => `<li>${mov.materialNome} (${mov.quantidade})</li>`
+                        (mov) =>
+                            `<li>${mov.materialNome} (${mov.quantidade})</li>`
                     )
                     .join("")}
             </ul>`,
@@ -1095,13 +1209,27 @@ async function deleteUserFromCognito(email, nome) {
 async function executeDeleteUserFromCognito(email, nome) {
     try {
         showAlert("usuarios-alert", "Excluindo usuário...", "info");
-
-        const params = {
-            UserPoolId: poolData.UserPoolId,
-            Username: email,
+        
+        const body = {
+            email: email // obrigatório só para admin
         };
 
-        await cognitoIdentityServiceProvider.adminDeleteUser(params).promise();
+        const res = await fetch(`${API_BASE_URL}/usuarios`, {
+            method: "DELETE",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${
+                    currentUser.getSignInUserSession().idToken.jwtToken
+                }`,
+                "X-Access-Token": `Bearer ${
+                    currentUser.getSignInUserSession().accessToken.jwtToken
+                }`
+            },
+            body: JSON.stringify(body)
+        });
+
+        const data = await res.json();  // retorno da API
+        console.log(data);
 
         // Remover das movimentações locais (manter histórico mas marcar como usuário excluído)
         movimentacoes.forEach((mov) => {
@@ -1110,7 +1238,8 @@ async function executeDeleteUserFromCognito(email, nome) {
             }
         });
 
-        saveDataToStorage();
+        await saveDataToStorage();
+        await loadDataFromStorage();
 
         showAlert(
             "usuarios-alert",
@@ -1122,6 +1251,7 @@ async function executeDeleteUserFromCognito(email, nome) {
         setTimeout(() => {
             loadUsuarios();
         }, 1000);
+
     } catch (error) {
         console.error("Erro ao excluir usuário do Cognito:", error);
 
@@ -1231,8 +1361,8 @@ Resumo:
 
 // Inicialização:
 window.addEventListener("load", () => {
-    // Carregar dados salvos
-    loadDataFromStorage();
+    // // Carregar dados salvos
+    // loadDataFromStorage();
 
     const hash = window.location.hash || "#login";
 
@@ -1259,9 +1389,16 @@ window.addEventListener("click", (event) => {
     }
 });
 
+function clearAlerts() {
+  const alertDivs = document.querySelectorAll(".alert");
+  alertDivs.forEach(div => div.remove());
+}
+
 setTimeout(() => {
     loadMateriais();
 }, 1000);
+
+setInterval(renovaTokens, 5 * 60 * 1000); // A cada 5 minutos
 
 async function carregarDadosJSON(caminhoArquivo) {
     try {

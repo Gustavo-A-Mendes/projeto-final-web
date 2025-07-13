@@ -127,7 +127,7 @@
                     <div class="tabs">
                         <div class="tab active" onclick="switchTab('retirada')">📦 Retirar Material</div>
                         <div class="tab" onclick="switchTab('historico')">📋 Meu Histórico</div>
-                        <div class="tab" onclick="switchTab('perfil')">👤 Meu Perfil</div>
+                        <div class="tab" onclick="switchTab('perfil-user')">👤 Meu Perfil</div>
                     </div>
 
                     <!-- Tab Retirada -->
@@ -196,14 +196,14 @@
                     </div>
 
                     <!-- Tab Perfil -->
-                    <div id="tab-perfil" class="tab-content">
+                    <div id="tab-perfil-user" class="tab-content">
                         <div class="card">
                             <h3>Meu Perfil</h3>
                             <div id="perfil-alert"></div>
                             <div class="profile-info">
-                                <p><strong>Nome:</strong> <span id="profile-name">-</span></p>
-                                <p><strong>Email:</strong> <span id="profile-email">-</span></p>
-                                <p><strong>Tipo:</strong> <span id="profile-role">Usuário Comum</span></p>
+                                <p><strong>Nome:</strong> <span id="profile-name-user">-</span></p>
+                                <p><strong>Email:</strong> <span id="profile-email-user">-</span></p>
+                                <p><strong>Tipo:</strong> <span id="profile-role-user">Usuário Comum</span></p>
                                 <p><strong>Movimentações Ativas:</strong> <span id="profile-active-movements">0</span></p>
                             </div>
                             
@@ -244,6 +244,7 @@
                         <div class="tab" onclick="switchTab('cadastrar')">➕ Cadastrar Material</div>
                         <div class="tab" onclick="switchTab('movimentacoes')">📋 Movimentações</div>
                         <div class="tab" onclick="switchTab('usuarios')">👥 Usuários</div>
+                        <div class="tab" onclick="switchTab('perfil-admin')">👤 Meu Perfil</div>
                     </div>
 
                     <!-- Tab Estoque -->
@@ -380,6 +381,28 @@
                                         </tr>
                                     </tbody>
                                 </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab Perfil -->
+                    <div id="tab-perfil-admin" class="tab-content">
+                        <div class="card">
+                            <h3>Meu Perfil</h3>
+                            <div id="perfil-alert"></div>
+                            <div class="profile-info">
+                                <p><strong>Nome:</strong> <span id="profile-name-admin">-</span></p>
+                                <p><strong>Email:</strong> <span id="profile-email-admin">-</span></p>
+                                <p><strong>Tipo:</strong> <span id="profile-role-admin">Usuário Comum</span></p>
+                                <p><strong>Movimentações Ativas:</strong> <span id="profile-active-movements">0</span></p>
+                            </div>
+                            
+                            <div class="danger-zone">
+                                <h4>⚠️ Zona de Perigo</h4>
+                                <p>A exclusão da conta é permanente e não pode ser desfeita.</p>
+                                <button class="btn-danger" onclick="deleteUserAccount()">
+                                    🗑️ Excluir Minha Conta
+                                </button>
                             </div>
                         </div>
                     </div>
