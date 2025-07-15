@@ -900,101 +900,101 @@ document.getElementById("material-form").addEventListener("submit", async (e) =>
 
 // Atualizar função de registrar retirada para usar API
 document.getElementById("retirada-form").addEventListener("submit", async (e) => {
-        e.preventDefault();
+    e.preventDefault();
 
-        const materialId = Number.parseInt(
-            document.getElementById("material-select").value
+    const materialId = Number.parseInt(
+        document.getElementById("material-select").value
+    );
+    const quantidade = Number.parseInt(
+        document.getElementById("quantidade-retirada").value
+    );
+    const finalidade = document.getElementById("finalidade").value;
+    const tempoUso = Number.parseInt(
+        document.getElementById("tempo-uso").value
+    );
+    const observacoes = document.getElementById("observacoes").value;
+
+    const material = materiais.find((m) => m.id === materialId);
+
+    if (!material) {
+        showAlert("retirada-alert", "Material não encontrado.", "error");
+        return;
+    }
+
+    if (quantidade > material.quantidade) {
+        showAlert(
+            "retirada-alert",
+            "Quantidade solicitada maior que disponível em estoque.",
+            "error"
         );
-        const quantidade = Number.parseInt(
-            document.getElementById("quantidade-retirada").value
-        );
-        const finalidade = document.getElementById("finalidade").value;
-        const tempoUso = Number.parseInt(
-            document.getElementById("tempo-uso").value
-        );
-        const observacoes = document.getElementById("observacoes").value;
+        return;
+    }
 
-        const material = materiais.find((m) => m.id === materialId);
+    const userName = document.getElementById("user-name").textContent;
+    const novaMovimentacao = {
+        usuario: userName,
+        materialId: materialId,
+        materialNome: material.nome,
+        quantidade,
+        finalidade,
+        observacoes: observacoes || "",
+        tempoUso: tempoUso,
+    };
 
-        if (!material) {
-            showAlert("retirada-alert", "Material não encontrado.", "error");
-            return;
-        }
+    try {
+        const response = await fetch(`${API_BASE_URL}/movimentacoes`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${
+                    currentUser.getSignInUserSession().idToken.jwtToken
+                }`,
+                "X-Access-Token": `Bearer ${
+                    currentUser.getSignInUserSession().accessToken.jwtToken
+                }`
+            },
+            body: JSON.stringify(novaMovimentacao),
+        });
 
-        if (quantidade > material.quantidade) {
+        if (response.ok) {
+            const movimentacaoCriada = await response.json();
+
+            // Atualizar dados locais
+            movimentacoes.push(movimentacaoCriada);
+
+            // Atualizar estoque local
+            material.quantidade -= quantidade;
+
             showAlert(
                 "retirada-alert",
-                "Quantidade solicitada maior que disponível em estoque.",
-                "error"
+                "Retirada registrada com sucesso!",
+                "success"
             );
-            return;
-        }
+            document.getElementById("retirada-form").reset();
 
-        const userName = document.getElementById("user-name").textContent;
-        const novaMovimentacao = {
-            usuario: userName,
-            materialId: materialId,
-            materialNome: material.nome,
-            quantidade,
-            finalidade,
-            observacoes: observacoes || "",
-            tempoUso: tempoUso,
-        };
+            loadMateriais();
+            loadHistoricoUsuario();
+            updateProfileInfo(
+                document.getElementById(`profile-email-${userRole}`).textContent,
+                userName
+            );
 
-        try {
-            const response = await fetch(`${API_BASE_URL}/movimentacoes`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${
-                        currentUser.getSignInUserSession().idToken.jwtToken
-                    }`,
-                    "X-Access-Token": `Bearer ${
-                        currentUser.getSignInUserSession().accessToken.jwtToken
-                    }`
-                },
-                body: JSON.stringify(novaMovimentacao),
-            });
-
-            if (response.ok) {
-                const movimentacaoCriada = await response.json();
-
-                // Atualizar dados locais
-                movimentacoes.push(movimentacaoCriada);
-
-                // Atualizar estoque local
-                material.quantidade -= quantidade;
-
-                showAlert(
-                    "retirada-alert",
-                    "Retirada registrada com sucesso!",
-                    "success"
-                );
-                document.getElementById("retirada-form").reset();
-
-                loadMateriais();
-                loadHistoricoUsuario();
-                updateProfileInfo(
-                    document.getElementById(`profile-email-${userRole}`).textContent,
-                    userName
-                );
-
-                if (userRole === "admin") {
-                    loadEstoque();
-                    loadMovimentacoes();
-                }
-            } else {
-                throw new Error("Erro ao registrar retirada");
+            if (userRole === "admin") {
+                loadEstoque();
+                loadMovimentacoes();
             }
-        } catch (error) {
-            console.error("Erro ao registrar retirada:", error);
-            showAlert(
-                "retirada-alert",
-                "Erro ao registrar retirada. Tente novamente.",
-                "error"
-            );
+        } else {
+            throw new Error("Erro ao registrar retirada");
         }
-    });
+    } catch (error) {
+        console.error("Erro ao registrar retirada:", error);
+        showAlert(
+            "retirada-alert",
+            "Erro ao registrar retirada. Tente novamente.",
+            "error"
+        );
+    }
+});
 
 // Atualizar 
 
