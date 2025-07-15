@@ -658,36 +658,59 @@ function loadMovimentacoes() {
     const tbody = document.getElementById("movimentacoes-tbody");
     tbody.innerHTML = "";
 
+    if (movimentacoes.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" style="text-align: center; color: #666;">
+                    Nenhuma movimentação encontrada
+                </td>
+            </tr>`;
+        return;
+    }
+
+    movimentacoes.sort((a, b) => new Date(b.criadoEm) - new Date(a.criadoEm));
+
     movimentacoes.forEach((mov) => {
         const row = document.createElement("tr");
         const statusClass =
             mov.status === "Devolvido" ? "status-returned" : "status-active";
 
+        // Exibir materiais como string resumida
+        const listaMateriais = mov.materiais
+            .map((m) => `${m.materialNome} (x${m.quantidade})`)
+            .join(", ");
+
+        const totalQuantidade = mov.materiais.reduce(
+            (soma, m) => soma + m.quantidade,
+            0
+        );
+
         row.innerHTML = `
             <td>${new Date(mov.criadoEm).toLocaleDateString("pt-BR")}</td>
             <td>${mov.usuario}</td>
-            <td>${mov.materialNome}</td>
-            <td>${mov.quantidade}</td>
+            <td>${listaMateriais}</td>
+            <td>${totalQuantidade}</td>
             <td>${mov.finalidade}</td>
-            <td><span class="status-badge ${statusClass}">${
-            mov.status
-        }</span></td>
-            <td></td> <!-- célula do botão ou tracinho -->
+            <td><span class="status-badge ${statusClass}">${mov.status}</span></td>
+            <td class="td-centralizado"></td>
         `;
 
-        // Cria e adiciona o botão apenas se o status for "Em uso"
-        if (mov.status === "Em uso") {
-            const button = document.createElement("button");
-            button.className = "btn-success";
-            button.textContent = "Devolver";
-            button.addEventListener("click", () => {
-                returnMaterial(mov.id);
-            });
+        const tdAcoes = row.lastElementChild;
 
-            row.lastElementChild.appendChild(button); // coloca na <td> vazia
-        } else {
-            row.lastElementChild.innerHTML =
-                '<span style="color: #666;">-</span>';
+        // Botão "Ver detalhes"
+        const btnDetalhes = document.createElement("button");
+        btnDetalhes.className = "historico-btn btn-ver";
+        btnDetalhes.innerHTML = "🔍 Ver detalhes";
+        btnDetalhes.addEventListener("click", () => abrirModal(mov));
+        tdAcoes.appendChild(btnDetalhes);
+
+        // Botão "Devolver" (se status ainda for "Em uso")
+        if (mov.status === "Em uso") {
+            const btnDevolver = document.createElement("button");
+            btnDevolver.className = "historico-btn btn-devolver";
+            btnDevolver.innerHTML = "↩️ Devolver";
+            btnDevolver.addEventListener("click", () => returnMaterial(mov.id));
+            tdAcoes.appendChild(btnDevolver);
         }
 
         tbody.appendChild(row);
@@ -707,47 +730,46 @@ function loadHistoricoUsuario() {
 
     if (userMovs.length === 0) {
         tbody.innerHTML =
-            '<tr><td colspan="5" style="text-align: center; color: #666;">Nenhuma movimentação encontrada</td></tr>';
+            '<tr><td colspan="6" style="text-align: center; color: #666;">Nenhuma movimentação encontrada</td></tr>';
         return;
     }
 
     // Ordenar por data (mais recente primeiro)
-    userMovs.sort((a, b) => new Date(b.data) - new Date(a.data));
+    userMovs.sort((a, b) => new Date(b.criadoEm) - new Date(a.criadoEm));
 
     userMovs.forEach((mov) => {
         const row = document.createElement("tr");
-        const statusClass =
-            mov.status === "Devolvido" ? "status-returned" : "status-active";
+        const statusClass = mov.status === "Devolvido" ? "status-returned" : "status-active";
 
         row.innerHTML = `
             <td>${new Date(mov.criadoEm).toLocaleDateString("pt-BR")}</td>
-            <td>${mov.materialNome}</td>
-            <td>${mov.quantidade}</td>
-            <td>${mov.finalidade}</td>
-            <td><span class="status-badge ${statusClass}">${
-            mov.status
-        }</span></td>
-            <td></td> <!-- célula do botão ou tracinho -->
+            <td>${mov.materiais?.length || 0} item(ns)</td>
+            <td>-</td>
+            <td>-</td>
+            <td><span class="status-badge ${statusClass}">${mov.status}</span></td>
+            <td></td>
         `;
 
-        // Cria e adiciona o botão apenas se o status for "Em uso"
-        if (mov.status === "Em uso") {
-            const button = document.createElement("button");
-            button.className = "btn-success";
-            button.textContent = "Devolver";
-            button.addEventListener("click", () => {
-                returnMaterial(mov.id);
-            });
+        // Botão "Ver detalhes" (sempre aparece)
+        const btnDetalhes = document.createElement("button");
+        btnDetalhes.className = "btn";
+        btnDetalhes.textContent = "Ver detalhes";
+        btnDetalhes.addEventListener("click", () => abrirModal(mov));
+        row.lastElementChild.appendChild(btnDetalhes);
 
-            row.lastElementChild.appendChild(button); // coloca na <td> vazia
-        } else {
-            row.lastElementChild.innerHTML =
-                '<span style="color: #666;">-</span>';
+        // Botão "Devolver" (se em uso)
+        if (mov.status === "Em uso") {
+            const btnDevolver = document.createElement("button");
+            btnDevolver.className = "btn btn-success";
+            btnDevolver.textContent = "Devolver";
+            btnDevolver.addEventListener("click", () => returnMaterial(mov.id));
+            row.lastElementChild.appendChild(btnDevolver);
         }
 
         tbody.appendChild(row);
     });
 }
+
 
 // Carregar usuários (admin)
 // Carregar usuários diretamente do Cognito (admin)
@@ -899,19 +921,14 @@ document.getElementById("material-form").addEventListener("submit", async (e) =>
     });
 
 // Atualizar função de registrar retirada para usar API
-document.getElementById("retirada-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
+let itensRetirada = [];
 
-    const materialId = Number.parseInt(
-        document.getElementById("material-select").value
-    );
-    const quantidade = Number.parseInt(
-        document.getElementById("quantidade-retirada").value
-    );
+// Adicionar item à lista temporária
+document.getElementById("adicionar-item").addEventListener("click", () => {
+    const materialId = Number.parseInt(document.getElementById("material-select").value);
+    const quantidade = Number.parseInt(document.getElementById("quantidade-retirada").value);
     const finalidade = document.getElementById("finalidade").value;
-    const tempoUso = Number.parseInt(
-        document.getElementById("tempo-uso").value
-    );
+    const tempoUso = Number.parseInt(document.getElementById("tempo-uso").value);
     const observacoes = document.getElementById("observacoes").value;
 
     const material = materiais.find((m) => m.id === materialId);
@@ -922,23 +939,37 @@ document.getElementById("retirada-form").addEventListener("submit", async (e) =>
     }
 
     if (quantidade > material.quantidade) {
-        showAlert(
-            "retirada-alert",
-            "Quantidade solicitada maior que disponível em estoque.",
-            "error"
-        );
+        showAlert("retirada-alert", "Quantidade solicitada maior que disponível.", "error");
+        return;
+    }
+
+    // Adiciona à lista
+    itensRetirada.push({
+        materialId,
+        materialNome: material.nome,
+        quantidade,
+        finalidade,
+        tempoUso,
+        observacoes: observacoes || ""
+    });
+
+    // Atualizar visual da lista
+    renderListaRetirada();
+    document.getElementById("retirada-form").reset();
+});
+
+// Enviar todos os itens da lista
+document.getElementById("confirmar-retirada").addEventListener("click", async () => {
+    if (itensRetirada.length === 0) {
+        showAlert("retirada-alert", "Nenhum item para retirada.", "error");
         return;
     }
 
     const userName = document.getElementById("user-name").textContent;
-    const novaMovimentacao = {
+
+    const movimentacao = {
         usuario: userName,
-        materialId: materialId,
-        materialNome: material.nome,
-        quantidade,
-        finalidade,
-        observacoes: observacoes || "",
-        tempoUso: tempoUso,
+        materiais: itensRetirada
     };
 
     try {
@@ -953,46 +984,41 @@ document.getElementById("retirada-form").addEventListener("submit", async (e) =>
                     currentUser.getSignInUserSession().accessToken.jwtToken
                 }`
             },
-            body: JSON.stringify(novaMovimentacao),
+            body: JSON.stringify(movimentacao),
         });
 
-        if (response.ok) {
-            const movimentacaoCriada = await response.json();
-
-            // Atualizar dados locais
-            movimentacoes.push(movimentacaoCriada);
-
-            // Atualizar estoque local
-            material.quantidade -= quantidade;
-
-            showAlert(
-                "retirada-alert",
-                "Retirada registrada com sucesso!",
-                "success"
-            );
-            document.getElementById("retirada-form").reset();
-
-            loadMateriais();
-            loadHistoricoUsuario();
-            updateProfileInfo(
-                document.getElementById(`profile-email-${userRole}`).textContent,
-                userName
-            );
-
-            if (userRole === "admin") {
-                loadEstoque();
-                loadMovimentacoes();
-            }
-        } else {
-            throw new Error("Erro ao registrar retirada");
+        if (!response.ok) {
+            throw new Error("Erro ao registrar movimentação");
         }
+
+        const resultado = await response.json();
+
+        movimentacoes.push(resultado);
+
+        // Atualizar estoque local
+        for (const item of itensRetirada) {
+            const material = materiais.find(m => m.id === item.materialId);
+            if (material) {
+                material.quantidade -= item.quantidade;
+            }
+        }
+
+        // Limpar interface
+        itensRetirada = [];
+        renderListaRetirada();
+        loadMateriais();
+        loadHistoricoUsuario();
+
+        if (userRole === "admin") {
+            loadEstoque();
+            loadMovimentacoes();
+        }
+
+        showAlert("retirada-alert", "Retirada registrada com sucesso!", "success");
+
     } catch (error) {
         console.error("Erro ao registrar retirada:", error);
-        showAlert(
-            "retirada-alert",
-            "Erro ao registrar retirada. Tente novamente.",
-            "error"
-        );
+        showAlert("retirada-alert", "Erro ao registrar retirada. Tente novamente.", "error");
     }
 });
 
@@ -1007,17 +1033,18 @@ async function returnMaterial(movimentacaoId) {
     }
 
     if (movimentacao.status === "Devolvido") {
-        alert("Material já foi devolvido.");
+        alert("Essa movimentação já foi devolvida.");
         return;
     }
 
-    if (
-        !confirm(
-            `Confirmar devolução de ${movimentacao.quantidade} ${movimentacao.materialNome}?`
-        )
-    ) {
-        return;
-    }
+    // Montar mensagem de confirmação
+    const listaMateriais = movimentacao.materiais.map((m) => `- ${m.materialNome} (x${m.quantidade})`).join("\n");
+
+    const confirmar = confirm(
+        `Confirmar devolução dos seguintes materiais?\n\n${listaMateriais}`
+    );
+
+    if (!confirmar) return;
 
     try {
         const response = await fetch(
@@ -1039,23 +1066,21 @@ async function returnMaterial(movimentacaoId) {
         if (response.ok) {
             const movimentacaoAtualizada = await response.json();
 
-            // Atualizar dados locais
-            const index = movimentacoes.findIndex(
-                (m) => m.id === movimentacaoId
-            );
+            // Atualizar lista local
+            const index = movimentacoes.findIndex((m) => m.id === movimentacaoId);
             if (index > -1) {
                 movimentacoes[index] = movimentacaoAtualizada;
             }
 
-            // Atualizar estoque local
-            const material = materiais.find(
-                (m) => m.nome === movimentacao.material
-            );
-            if (material) {
-                material.quantidade += movimentacao.quantidade;
-            }
+            // Atualizar o estoque local para cada material
+            movimentacao.materiais.forEach((mat) => {
+                const materialEstoque = materiais.find((m) => m.nome === mat.materialNome);
+                if (materialEstoque) {
+                    materialEstoque.quantidade += mat.quantidade;
+                }
+            });
 
-            // Recarregar dados
+            // Recarregar telas
             if (userRole === "admin") {
                 loadEstoque();
                 loadMovimentacoes();
@@ -1068,13 +1093,13 @@ async function returnMaterial(movimentacaoId) {
                 );
             }
 
-            alert("Material devolvido com sucesso!");
+            alert("Devolução realizada com sucesso!");
         } else {
-            throw new Error("Erro ao devolver material");
+            throw new Error("Erro ao devolver materiais");
         }
     } catch (error) {
-        console.error("Erro ao devolver material:", error);
-        alert("Erro ao devolver material. Tente novamente.");
+        console.error("Erro ao devolver materiais:", error);
+        alert("Erro ao devolver materiais. Tente novamente.");
     }
 }
 
@@ -1299,6 +1324,61 @@ function confirmAction() {
         pendingAction = null;
     }
     closeModal();
+}
+
+function abrirModal(movimentacao) {
+    const container = document.getElementById("detalhes-movimentacao");
+    container.innerHTML = `
+        <p><strong>Data:</strong> ${new Date(movimentacao.dataRetirada).toLocaleString("pt-BR")}</p>
+        <p><strong>Status:</strong> ${movimentacao.status}</p>
+        <hr>
+        <h4>Materiais:</h4>
+        <ul>
+            ${movimentacao.materiais.map(m => `
+                <li style="margin-bottom: 10px;">
+                    <strong>${m.materialNome}</strong><br>
+                    Quantidade: ${m.quantidade}<br>
+                    Finalidade: ${m.finalidade}<br>
+                    Tempo de uso: ${m.tempoUso} dia(s)<br>
+                    Observações: ${m.observacoes || "Nenhuma"}
+                </li>
+            `).join("")}
+        </ul>
+    `;
+
+    document.getElementById("modal-detalhes").style.display = "block";
+}
+
+function fecharModal() {
+    document.getElementById("modal-detalhes").style.display = "none";
+}
+
+function renderListaRetirada() {
+    const container = document.getElementById("lista-retirada");
+    container.innerHTML = "";
+    
+    if (itensRetirada.length === 0) {
+        container.innerHTML = "<p>Nenhum item adicionado.</p>";
+        return;
+    }
+    
+    const list = document.createElement("ul");
+    itensRetirada.forEach((item, index) => {
+        const li = document.createElement("li");
+        li.textContent = `${item.quantidade}x ${item.materialNome} - Finalidade: ${item.finalidade}`;
+        
+        const removeBtn = document.createElement("button");
+        removeBtn.textContent = "Remover";
+        removeBtn.onclick = () => {
+            itensRetirada.splice(index, 1);
+            renderListaRetirada();
+        };
+        
+        li.appendChild(removeBtn);
+        list.appendChild(li);
+    });
+    
+    container.appendChild(list);
 }
 
 // ================================================================================

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,6 +9,7 @@
     <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1.24.min.js"></script>
     <script src="https://unpkg.com/amazon-cognito-identity-js@6.3.12/dist/amazon-cognito-identity.min.js"></script>
 </head>
+
 <body>
     <!-- Tela de Login -->
     <div id="login" class="screen">
@@ -43,11 +45,12 @@
             <div class="auth-card">
                 <h2>📝 Cadastro</h2>
                 <div id="cadastro-alert"></div>
-                
+
                 <div class="role-info">
                     <h4>ℹ️ Informação sobre Tipos de Usuário</h4>
                     <p><strong>Usuário Comum:</strong> Pode retirar materiais e visualizar seu histórico.</p>
-                    <p><strong>Administrador:</strong> Pode gerenciar estoque, cadastrar materiais e ver todas as movimentações.</p>
+                    <p><strong>Administrador:</strong> Pode gerenciar estoque, cadastrar materiais e ver todas as
+                        movimentações.</p>
                     <p><em>Nota: O tipo será definido pelo administrador após o cadastro.</em></p>
                 </div>
 
@@ -135,6 +138,8 @@
                         <div class="card">
                             <h3>Registrar Retirada de Material</h3>
                             <div id="retirada-alert"></div>
+
+                            <!-- Formulário de adição de item -->
                             <form id="retirada-form">
                                 <div class="form-row">
                                     <div class="form-group">
@@ -151,7 +156,8 @@
                                 <div class="form-row">
                                     <div class="form-group">
                                         <label for="finalidade">Finalidade:</label>
-                                        <input type="text" id="finalidade" required placeholder="Ex: Experimento de robótica">
+                                        <input type="text" id="finalidade" required
+                                            placeholder="Ex: Experimento de robótica">
                                     </div>
                                     <div class="form-group">
                                         <label for="tempo-uso">Tempo de Uso (dias):</label>
@@ -160,12 +166,25 @@
                                 </div>
                                 <div class="form-group">
                                     <label for="observacoes">Observações:</label>
-                                    <textarea id="observacoes" placeholder="Observações adicionais (opcional)"></textarea>
+                                    <textarea id="observacoes"
+                                        placeholder="Observações adicionais (opcional)"></textarea>
                                 </div>
-                                <button type="submit" class="btn">Registrar Retirada</button>
+
+                                <div class="form-row" style="justify-content: space-between;">
+                                    <button type="button" class="btn" id="adicionar-item">Adicionar à Lista</button>
+                                    <button type="button" class="btn" id="confirmar-retirada">Confirmar
+                                        Retirada</button>
+                                </div>
                             </form>
+
+                            <!-- Lista de itens adicionados -->
+                            <div id="lista-retirada" style="margin-top: 20px;">
+                                <h4>Itens adicionados:</h4>
+                                <!-- Essa div será preenchida dinamicamente via JavaScript -->
+                            </div>
                         </div>
                     </div>
+
 
                     <!-- Tab Histórico -->
                     <div id="tab-historico" class="tab-content">
@@ -204,9 +223,10 @@
                                 <p><strong>Nome:</strong> <span id="profile-name-user">-</span></p>
                                 <p><strong>Email:</strong> <span id="profile-email-user">-</span></p>
                                 <p><strong>Tipo:</strong> <span id="profile-role-user">Usuário Comum</span></p>
-                                <p><strong>Movimentações Ativas:</strong> <span id="profile-active-movements">0</span></p>
+                                <p><strong>Movimentações Ativas:</strong> <span id="profile-active-movements">0</span>
+                                </p>
                             </div>
-                            
+
                             <div class="danger-zone">
                                 <h4>⚠️ Zona de Perigo</h4>
                                 <p>A exclusão da conta é permanente e não pode ser desfeita.</p>
@@ -317,7 +337,8 @@
                                 </div>
                                 <div class="form-group">
                                     <label for="material-descricao">Descrição:</label>
-                                    <textarea id="material-descricao" required placeholder="Descrição detalhada do material"></textarea>
+                                    <textarea id="material-descricao" required
+                                        placeholder="Descrição detalhada do material"></textarea>
                                 </div>
                                 <button type="submit" class="btn">Cadastrar Material</button>
                             </form>
@@ -350,7 +371,8 @@
                             <button onclick="debugData()" class="btn-info">
                                 🔍 Debug - Ver Dados
                             </button>
-                            <button onclick="clearStorage(); location.reload();" class="btn-danger" style="margin-left: 10px;">
+                            <button onclick="clearStorage(); location.reload();" class="btn-danger"
+                                style="margin-left: 10px;">
                                 🗑️ Limpar Dados
                             </button>
                         </div>
@@ -394,9 +416,10 @@
                                 <p><strong>Nome:</strong> <span id="profile-name-admin">-</span></p>
                                 <p><strong>Email:</strong> <span id="profile-email-admin">-</span></p>
                                 <p><strong>Tipo:</strong> <span id="profile-role-admin">Usuário Comum</span></p>
-                                <p><strong>Movimentações Ativas:</strong> <span id="profile-active-movements">0</span></p>
+                                <p><strong>Movimentações Ativas:</strong> <span id="profile-active-movements">0</span>
+                                </p>
                             </div>
-                            
+
                             <div class="danger-zone">
                                 <h4>⚠️ Zona de Perigo</h4>
                                 <p>A exclusão da conta é permanente e não pode ser desfeita.</p>
@@ -429,6 +452,15 @@
         </div>
     </div>
 
+    <!-- Modal de detalhes da movimentação -->
+    <div id="modal-detalhes" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="fecharModal()">&times;</span>
+            <h3>Detalhes da Movimentação</h3>
+            <div id="detalhes-movimentacao"></div>
+        </div>
+    </div>
     <script src="script.js"></script>
 </body>
+
 </html>

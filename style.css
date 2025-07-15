@@ -91,8 +91,10 @@ body {
 }
 
 .btn {
-    width: 100%;
+    width: 70%;
     padding: 12px;
+    justify-content: center;
+    align-items: center;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     border: none;
@@ -159,6 +161,7 @@ body {
     background: #28a745;
     color: white;
     border: none;
+    margin: 2px 0;
     padding: 6px 12px;
     border-radius: 4px;
     cursor: pointer;
@@ -407,6 +410,22 @@ tr:hover {
     line-height: 1.5;
 }
 
+#lista-retirada ul {
+    list-style-type: none;
+    padding-left: 0;
+}
+
+#lista-retirada li {
+    padding: 6px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#lista-retirada button {
+    margin-left: 12px;
+}
+
 /* Profile */
 .profile-info {
     background: #f8f9fa;
@@ -605,4 +624,118 @@ tr:hover {
         width: 100%;
         margin-bottom: 10px;
     }
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 9999;
+    left: 0;
+    top: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.5);
+    overflow: auto;
+}
+
+.modal-content {
+    background-color: #fff;
+    color: #333;
+    margin: 8% auto;
+    padding: 24px;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 600px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+    position: relative;
+    font-family: "Segoe UI", sans-serif;
+}
+
+.modal-content h3 {
+    margin-top: 0;
+    font-size: 1.5rem;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 8px;
+    margin-bottom: 16px;
+}
+
+.modal-content ul {
+    list-style: none;
+    padding-left: 0;
+    margin-top: 8px;
+}
+
+.modal-content li {
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+    line-height: 1.5;
+}
+
+.modal-content li strong {
+    display: block;
+    font-size: 1.1rem;
+    color: #222;
+    margin-bottom: 4px;
+}
+
+.modal-content p {
+    margin: 6px 0;
+}
+
+.close {
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    font-size: 1.4rem;
+    font-weight: bold;
+    color: #999;
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+
+.close:hover {
+    color: #333;
+}
+
+.historico-btn {
+    display: inline-block;
+    padding: 6px 10px;
+    font-size: 0.85rem;
+    border: none;
+    border-radius: 6px;
+    margin: 2px 4px;
+    cursor: pointer;
+    transition: background-color 0.2s ease, transform 0.1s ease;
+    white-space: nowrap;
+}
+
+.historico-btn:hover {
+    transform: scale(1.03);
+}
+
+.btn-ver {
+    background-color: #3498db;
+    color: white;
+}
+
+.btn-ver:hover {
+    background-color: #2980b9;
+}
+
+.btn-devolver {
+    background-color: #2ecc71;
+    color: white;
+}
+
+.btn-devolver:hover {
+    background-color: #27ae60;
+}
+
+#movimentacoes-table td:last-child,
+#movimentacoes-table td:last-child button {
+    text-align: center;
+    vertical-align: middle;
 }
